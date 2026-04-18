@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>MathLearn — регистрация</title>
+  <link rel="stylesheet" href="/webjars/bootstrap/5.3.0/css/bootstrap.min.css">
+  <style>
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        background-color: #f9fafc;
+        color: #1e293b;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .navbar {
+        background-color: white !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border-bottom: 1px solid #e9edf2;
+    }
+    .navbar-brand {
+        color: #0f172a !important;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+    .btn-outline-light {
+        color: #475569;
+        border-color: #e2e8f0;
+        background: white;
+    }
+    .btn-outline-light:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #0f172a;
+    }
+    .register-card {
+        border: 1px solid #e9edf2;
+        border-radius: 16px;
+        box-shadow: 0 8px 20px -4px rgba(0,0,0,0.02);
+        background: white;
+        max-width: 450px;
+        margin: 0 auto;
+    }
+    .form-control {
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        font-size: 1rem;
+    }
+    .form-control:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+    .form-control.is-invalid {
+        border-color: #dc2626;
+    }
+    .btn-primary {
+        background-color: #2563eb;
+        border: none;
+        font-weight: 500;
+        padding: 12px;
+        border-radius: 8px;
+        width: 100%;
+    }
+    .btn-primary:hover {
+        background-color: #1d4ed8;
+    }
+    .auth-link {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .auth-link:hover {
+        text-decoration: underline;
+    }
+    .divider {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 0.9rem;
+        margin: 24px 0;
+    }
+    .divider::before,
+    .divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .divider::before {
+        margin-right: 16px;
+    }
+    .divider::after {
+        margin-left: 16px;
+    }
+    .alert {
+        border-radius: 8px;
+        border: none;
+        background-color: #fef2f2;
+        color: #991b1b;
+        padding: 12px 16px;
+        font-size: 0.9rem;
+    }
+    .password-requirements {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-top: 6px;
+        padding-left: 0;
+    }
+    .password-requirements li {
+        list-style-type: none;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+    }
+    .valid {
+        color: #16a34a;
+    }
+    .invalid {
+        color: #94a3b8;
+    }
+    .error-message {
+        color: #dc2626;
+        font-size: 0.85rem;
+        margin-top: 4px;
+    }
+    .info-box {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 0.9rem;
+        color: #475569;
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <span class="navbar-brand">MathLearn</span>
+    <a href="/" class="btn btn-outline-light">На главную</a>
+  </div>
+</nav>
+
+<main class="container mt-5 flex-grow-1">
+  <div class="register-card p-4">
+    <h2 class="mb-3" style="font-weight: 600; color: #0f172a;">Создать аккаунт</h2>
+    <p class="text-secondary mb-4">Начните обучение за пару минут</p>
+
+    <div th:if="${error}" class="alert alert-danger mb-4" th:text="${error}"></div>
+
+    <form action="/register" method="post" th:object="${user}">
+      <div class="mb-4">
+        <label for="username" class="form-label text-secondary">Имя пользователя</label>
+        <input type="text" class="form-control"
+               th:classappend="${#fields.hasErrors('username')} ? 'is-invalid' : ''"
+               id="username" th:field="*{username}"
+               placeholder="username" required>
+        <div class="error-message" th:if="${#fields.hasErrors('username')}"
+             th:errors="*{username}"></div>
+        <small class="text-secondary">От 3 до 50 символов, только буквы, цифры и _</small>
+      </div>
+
+      <div class="mb-4">
+        <label for="email" class="form-label text-secondary">Email</label>
+        <input type="email" class="form-control"
+               th:classappend="${#fields.hasErrors('email')} ? 'is-invalid' : ''"
+               id="email" th:field="*{email}"
+               placeholder="email@example.com" required>
+        <div class="error-message" th:if="${#fields.hasErrors('email')}"
+             th:errors="*{email}"></div>
+      </div>
+
+      <div class="mb-4">
+        <label for="password" class="form-label text-secondary">Пароль</label>
+        <input type="password" class="form-control"
+               th:classappend="${#fields.hasErrors('password')} ? 'is-invalid' : ''"
+               id="password" th:field="*{password}"
+               placeholder="••••••••" required>
+        <div class="error-message" th:if="${#fields.hasErrors('password')}"
+             th:errors="*{password}"></div>
+
+        <ul class="password-requirements mt-2">
+          <li th:class="${#strings.length(user.password) >= 3} ? 'valid' : 'invalid'">
+            <span th:if="${#strings.length(user.password) >= 3}">✓</span>
+            <span th:unless="${#strings.length(user.password) >= 3}">○</span>
+            Минимум 3 символа
+          </li>
+        </ul>
+      </div>
+
+      <div class="info-box mb-4">
+        <strong class="d-block mb-1">После регистрации</strong>
+        <p class="mb-0 small">
+          Вы начнёте с 1 уровня. Система будет автоматически подбирать задачи под ваш прогресс.
+        </p>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+    </form>
+
+    <div class="divider">или</div>
+
+    <p class="text-center mb-0">
+      <span class="text-secondary">Уже есть аккаунт?</span>
+      <a href="/login" class="auth-link ms-2">Войти</a>
+    </p>
+  </div>
+</main>
+</body>
+</html>

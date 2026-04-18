@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>MathLearn — профиль</title>
+  <link rel="stylesheet" href="/webjars/bootstrap/5.3.0/css/bootstrap.min.css">
+  <style>
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        background-color: #f9fafc;
+        color: #1e293b;
+    }
+    .navbar {
+        background-color: white !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border-bottom: 1px solid #e9edf2;
+    }
+    .navbar-brand {
+        color: #0f172a !important;
+        font-weight: 600;
+    }
+    .btn-outline-light {
+        color: #475569;
+        border-color: #e2e8f0;
+        background: white;
+    }
+    .btn-outline-light:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #0f172a;
+    }
+    .card {
+        border: 1px solid #e9edf2;
+        border-radius: 12px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        background: white;
+    }
+    .stat-card {
+        padding: 20px;
+        border-radius: 12px;
+        background: linear-gradient(145deg, #ffffff, #fafbfc);
+        border: 1px solid #e9edf2;
+    }
+    .stat-value {
+        font-size: 2.2rem;
+        font-weight: 600;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+    .stat-label {
+        color: #64748b;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+    }
+    .progress {
+        height: 8px;
+        border-radius: 4px;
+        background-color: #e9edf2;
+    }
+    .progress-bar {
+        background-color: #2563eb;
+        border-radius: 4px;
+    }
+    .level-badge {
+        display: inline-block;
+        background: #f1f5f9;
+        color: #475569;
+        padding: 4px 10px;
+        border-radius: 16px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+    .recommendation-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 0.95rem;
+    }
+    .table {
+        font-size: 0.95rem;
+    }
+    .table th {
+        font-weight: 500;
+        color: #64748b;
+        border-bottom-width: 1px;
+    }
+    .badge-success {
+        background-color: #dcfce7;
+        color: #166534;
+        font-weight: 500;
+        padding: 4px 8px;
+        border-radius: 16px;
+    }
+    .badge-warning {
+        background-color: #fef3c7;
+        color: #92400e;
+        font-weight: 500;
+        padding: 4px 8px;
+        border-radius: 16px;
+    }
+    .btn-primary {
+        background-color: #2563eb;
+        border: none;
+        font-weight: 500;
+        padding: 10px 20px;
+        border-radius: 8px;
+    }
+    .btn-outline-secondary {
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        font-weight: 500;
+        padding: 10px 20px;
+        border-radius: 8px;
+    }
+    .btn-outline-secondary:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #1e293b;
+    }
+    .user-info {
+        border-bottom: 1px solid #e9edf2;
+        padding-bottom: 16px;
+        margin-bottom: 16px;
+    }
+    .user-info:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <span class="navbar-brand">MathLearn</span>
+    <div>
+      <a href="/learn" class="btn btn-outline-light me-2">Обучение</a>
+      <a href="/logout" class="btn btn-outline-light">Выйти</a>
+    </div>
+  </div>
+</nav>
+
+<main class="container mt-4">
+  <!-- Приветствие -->
+  <div class="mb-4">
+    <h2 class="fw-semibold" style="color: #0f172a;">Привет, <span th:text="${user.username}"></span></h2>
+    <p class="text-secondary">Ваш прогресс в обучении</p>
+  </div>
+
+  <div class="row g-4">
+    <!-- Левая колонка - информация -->
+    <div class="col-md-4">
+      <div class="card p-4">
+        <div class="user-info">
+          <div class="text-secondary small mb-1">Email</div>
+          <div class="fw-medium" th:text="${user.email}"></div>
+        </div>
+
+        <div class="user-info">
+          <div class="text-secondary small mb-1">Начало обучения</div>
+          <div class="fw-medium" th:text="${#temporals.format(user.createdAt, 'dd MMM yyyy')}"></div>
+        </div>
+
+        <div class="user-info">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-secondary small">Текущий уровень</span>
+            <span class="level-badge" th:text="${user.currentLevel} + '/5'"></span>
+          </div>
+          <div class="progress">
+            <div class="progress-bar" th:style="'width: ' + (${user.currentLevel} * 20) + '%'"></div>
+          </div>
+        </div>
+
+        <div th:if="${recommendedLevel}" class="recommendation-box mt-3">
+          <div class="text-secondary small mb-1">Рекомендация</div>
+          <div class="fw-medium" th:text="'Продолжайте на уровне ' + ${recommendedLevel} + '/5'"></div>
+          <div class="small text-secondary mt-1" th:if="${weakTopic == 'algebra'}">
+            ⚡ Уделите больше внимания алгебре
+          </div>
+          <div class="small text-secondary mt-1" th:if="${weakTopic == 'geometry'}">
+            ⚡ Уделите больше внимания геометрии
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Правая колонка - статистика -->
+    <div class="col-md-8">
+      <div class="row g-3">
+        <div class="col-sm-4">
+          <div class="stat-card text-center">
+            <div class="stat-value" th:text="${user.totalCorrect}">0</div>
+            <div class="stat-label">Правильных</div>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="stat-card text-center">
+            <div class="stat-value" th:text="${user.totalAttempts}">0</div>
+            <div class="stat-label">Всего попыток</div>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="stat-card text-center">
+            <div class="stat-value" th:text="${#numbers.formatDecimal(successRate, 1, 1)} + '%'">0%</div>
+            <div class="stat-label">Успешность</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Прогресс по уровням -->
+      <div class="card p-4 mt-3">
+        <h5 class="mb-3" style="font-weight: 500;">Прогресс по уровням</h5>
+        <table class="table">
+          <thead>
+          <tr>
+            <th>Уровень</th>
+            <th>Всего</th>
+            <th>Решено</th>
+            <th>Прогресс</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr th:each="entry : ${levelStats}">
+            <td>
+                                    <span th:classappend="${entry.key == user.currentLevel} ? 'fw-bold text-primary' : ''"
+                                          th:text="'Уровень ' + ${entry.key}"></span>
+            </td>
+            <td th:text="${entry.value.total}"></td>
+            <td th:text="${entry.value.solved}"></td>
+            <td style="width: 150px;">
+              <div class="progress">
+                <div class="progress-bar"
+                     th:style="'width: ' + ${entry.value.percent} + '%'"
+                     th:text="${entry.value.percent} + '%'">
+                </div>
+              </div>
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Последние задачи -->
+      <div class="card p-4 mt-3">
+        <h5 class="mb-3" style="font-weight: 500;">Последние задачи</h5>
+
+        <div th:if="${recentTasks.empty}" class="text-secondary text-center py-4">
+          Пока нет решённых задач
+        </div>
+
+        <div th:unless="${recentTasks.empty}" class="table-responsive">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>Задача</th>
+              <th>Тема</th>
+              <th>Результат</th>
+              <th>Дата</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="task : ${recentTasks}">
+              <td>
+                <span th:text="${task.taskText.length() > 30 ? task.taskText.substring(0,30) + '…' : task.taskText}"></span>
+                <span class="badge bg-secondary ms-1" th:text="${task.level}"></span>
+              </td>
+              <td th:text="${task.topic == 'algebra' ? 'Алгебра' : 'Геометрия'}"></td>
+              <td>
+                <span th:if="${task.solved}" class="badge-success">Решено</span>
+                <span th:unless="${task.solved}" class="badge-warning">В процессе</span>
+              </td>
+              <td class="text-secondary small" th:text="${#temporals.format(task.createdAt, 'dd MMM')}"></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Кнопки действий -->
+      <div class="d-flex gap-2 mt-3">
+        <a href="/learn" class="btn btn-primary flex-grow-1">Продолжить обучение</a>
+        <a href="/reset" class="btn btn-outline-secondary"
+           onclick="return confirm('Весь прогресс будет сброшен. Вы уверены?')">
+          Сбросить
+        </a>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

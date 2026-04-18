@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>MathLearn — адаптивное обучение</title>
+  <link rel="stylesheet" href="/webjars/bootstrap/5.3.0/css/bootstrap.min.css">
+  <style>
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        background-color: #f9fafc;
+        color: #1e293b;
+    }
+    .navbar {
+        background-color: white !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        border-bottom: 1px solid #e9edf2;
+    }
+    .navbar-brand {
+        color: #0f172a !important;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+    .btn-outline-light {
+        color: #475569;
+        border-color: #e2e8f0;
+        background: white;
+    }
+    .btn-outline-light:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #0f172a;
+    }
+    .card {
+        border: 1px solid #e9edf2;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -2px rgba(0,0,0,0.02);
+        background: white;
+    }
+    .btn-primary {
+        background-color: #2563eb;
+        border: none;
+        font-weight: 500;
+        padding: 12px 24px;
+        border-radius: 8px;
+    }
+    .btn-primary:hover {
+        background-color: #1d4ed8;
+    }
+    .feature-list {
+        list-style: none;
+        padding: 0;
+    }
+    .feature-list li {
+        padding: 8px 0;
+        border-bottom: 1px solid #f1f5f9;
+        color: #475569;
+    }
+    .feature-list li:last-child {
+        border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <span class="navbar-brand">MathLearn</span>
+    <div>
+      <a href="/profile" class="btn btn-outline-light me-2">Профиль</a>
+      <a href="/logout" class="btn btn-outline-light">Выйти</a>
+    </div>
+  </div>
+</nav>
+
+<main class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card p-4">
+        <h2 class="mb-4" style="font-weight: 600; color: #0f172a;">Адаптивное обучение математике</h2>
+
+        <p class="lead text-secondary mb-4">
+          Система подбирает задачи под ваш уровень, анализирует прогресс и помогает эффективно учиться.
+        </p>
+
+        <div class="row mt-4">
+          <div class="col-md-6">
+            <h5 class="mb-3" style="font-weight: 500;">Алгебра</h5>
+            <ul class="feature-list">
+              <li>Уравнения и системы</li>
+              <li>Функции и графики</li>
+              <li>Последовательности</li>
+            </ul>
+            <a href="/learn?topic=algebra&level=1" class="btn btn-primary w-100 mt-3">
+              Начать
+            </a>
+          </div>
+          <div class="col-md-6">
+            <h5 class="mb-3" style="font-weight: 500;">Геометрия</h5>
+            <ul class="feature-list">
+              <li>Площади и периметры</li>
+              <li>Объёмы фигур</li>
+              <li>Теорема Пифагора</li>
+            </ul>
+            <a href="/learn?topic=geometry&level=1" class="btn btn-primary w-100 mt-3">
+              Начать
+            </a>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 text-center text-secondary small">
+          <span class="mx-2">⚡ JADE агенты активны</span>
+          <span class="mx-2">•</span>
+          <span class="mx-2">📊 PostgreSQL</span>
+          <span class="mx-2">•</span>
+          <span class="mx-2">🤖 Ollama / Gemini</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>
