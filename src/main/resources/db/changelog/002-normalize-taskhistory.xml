@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="002-1-create-math_tasks" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="math_tasks"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="math_tasks">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="topic" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="level" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="task_text" type="VARCHAR(1000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="002-2-uk-math_tasks" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="math_tasks"/>
+                <not>
+                    <uniqueConstraintExists tableName="math_tasks" constraintName="uk_math_tasks_topic_level_text"/>
+                </not>
+            </and>
+        </preConditions>
+
+        <addUniqueConstraint
+                tableName="math_tasks"
+                columnNames="topic, level, task_text"
+                constraintName="uk_math_tasks_topic_level_text"/>
+    </changeSet>
+
+    <changeSet id="002-3-add-task_id" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="task_history"/>
+                <not>
+                    <columnExists tableName="task_history" columnName="task_id"/>
+                </not>
+            </and>
+        </preConditions>
+
+        <addColumn tableName="task_history">
+            <column name="task_id" type="BIGINT"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="002-4-fill-math_tasks" author="cascade" runInTransaction="true">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="task_history"/>
+                <tableExists tableName="math_tasks"/>
+                <columnExists tableName="task_history" columnName="topic"/>
+                <columnExists tableName="task_history" columnName="level"/>
+                <columnExists tableName="task_history" columnName="task_text"/>
+                <uniqueConstraintExists tableName="math_tasks" constraintName="uk_math_tasks_topic_level_text"/>
+            </and>
+        </preConditions>
+
+        <sql dbms="postgresql">
+            INSERT INTO math_tasks (topic, level, task_text, created_at)
+            SELECT
+                th.topic,
+                th.level,
+                th.task_text,
+                COALESCE(MIN(th.created_at), CURRENT_TIMESTAMP) AS created_at
+            FROM task_history th
+            WHERE th.topic IS NOT NULL
+              AND th.level IS NOT NULL
+              AND th.task_text IS NOT NULL
+            GROUP BY th.topic, th.level, th.task_text
+            ON CONFLICT (topic, level, task_text) DO NOTHING;
+        </sql>
+    </changeSet>
+
+    <changeSet id="002-5-backfill-task_id" author="cascade" runInTransaction="true">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="task_history"/>
+                <tableExists tableName="math_tasks"/>
+                <columnExists tableName="task_history" columnName="task_id"/>
+                <columnExists tableName="task_history" columnName="topic"/>
+                <columnExists tableName="task_history" columnName="level"/>
+                <columnExists tableName="task_history" columnName="task_text"/>
+            </and>
+        </preConditions>
+
+        <sql dbms="postgresql">
+            UPDATE task_history th
+            SET task_id = mt.id
+            FROM math_tasks mt
+            WHERE th.task_id IS NULL
+              AND th.topic = mt.topic
+              AND th.level = mt.level
+              AND th.task_text = mt.task_text;
+        </sql>
+    </changeSet>
+
+    <changeSet id="002-6-fk-task_history-task" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="task_history"/>
+                <tableExists tableName="math_tasks"/>
+                <columnExists tableName="task_history" columnName="task_id"/>
+                <not>
+                    <foreignKeyConstraintExists foreignKeyName="fk_task_history_task"/>
+                </not>
+            </and>
+        </preConditions>
+
+        <addForeignKeyConstraint
+                baseTableName="task_history"
+                baseColumnNames="task_id"
+                referencedTableName="math_tasks"
+                referencedColumnNames="id"
+                constraintName="fk_task_history_task"/>
+    </changeSet>
+
+    <changeSet id="002-7-drop-task_history-topic" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="task_history" columnName="topic"/>
+        </preConditions>
+
+        <dropColumn tableName="task_history" columnName="topic"/>
+    </changeSet>
+
+    <changeSet id="002-8-drop-task_history-level" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="task_history" columnName="level"/>
+        </preConditions>
+
+        <dropColumn tableName="task_history" columnName="level"/>
+    </changeSet>
+
+    <changeSet id="002-9-drop-task_history-task_text" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="task_history" columnName="task_text"/>
+        </preConditions>
+
+        <dropColumn tableName="task_history" columnName="task_text"/>
+    </changeSet>
+
+    <changeSet id="002-10-idx-task_history-task_id" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="task_history"/>
+                <columnExists tableName="task_history" columnName="task_id"/>
+                <not>
+                    <indexExists tableName="task_history" indexName="idx_task_history_task_id"/>
+                </not>
+            </and>
+        </preConditions>
+
+        <createIndex tableName="task_history" indexName="idx_task_history_task_id">
+            <column name="task_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="002-11-dedup-solved-per-user-task" author="cascade" runInTransaction="true">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="task_history"/>
+                <columnExists tableName="task_history" columnName="user_id"/>
+                <columnExists tableName="task_history" columnName="task_id"/>
+                <columnExists tableName="task_history" columnName="solved"/>
+                <sqlCheck expectedResult="1">
+                    SELECT CASE WHEN EXISTS (
+                        SELECT 1
+                        FROM task_history
+                        WHERE solved = true
+                          AND user_id IS NOT NULL
+                        GROUP BY user_id, task_id
+                        HAVING COUNT(*) &gt; 1
+                    ) THEN 1 ELSE 0 END;
+                </sqlCheck>
+            </and>
+        </preConditions>
+
+        <sql dbms="postgresql">
+            DELETE FROM task_history th
+            USING task_history th_keep
+            WHERE th.solved = true
+              AND th.user_id IS NOT NULL
+              AND th_keep.solved = true
+              AND th_keep.user_id = th.user_id
+              AND th_keep.task_id = th.task_id
+              AND th_keep.id &lt; th.id;
+        </sql>
+    </changeSet>
+
+    <changeSet id="002-12-ux-task_history-user-task-solved" author="cascade" runInTransaction="true">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="task_history"/>
+                <columnExists tableName="task_history" columnName="user_id"/>
+                <columnExists tableName="task_history" columnName="task_id"/>
+                <columnExists tableName="task_history" columnName="solved"/>
+                <not>
+                    <indexExists tableName="task_history" indexName="ux_task_history_user_task_solved"/>
+                </not>
+                <sqlCheck expectedResult="0">
+                    SELECT COUNT(*)
+                    FROM (
+                        SELECT user_id, task_id
+                        FROM task_history
+                        WHERE solved = true
+                          AND user_id IS NOT NULL
+                        GROUP BY user_id, task_id
+                        HAVING COUNT(*) &gt; 1
+                    ) d;
+                </sqlCheck>
+            </and>
+        </preConditions>
+
+        <sql dbms="postgresql">
+            CREATE UNIQUE INDEX ux_task_history_user_task_solved
+                ON task_history (user_id, task_id)
+                WHERE solved = true;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

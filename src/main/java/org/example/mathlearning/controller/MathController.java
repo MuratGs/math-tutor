@@ -149,6 +149,11 @@ public class MathController {
 
         log.info("Результат проверки: {} (правильно: {})", result, isCorrect);
 
+        session.setAttribute("lastTask", task);
+        session.setAttribute("lastAnswer", answer);
+        session.setAttribute("lastResult", result);
+        session.setAttribute("lastIsCorrect", isCorrect);
+
         userService.updateUserStats(userId, isCorrect);
         user = userRepository.findById(userId).orElse(user);
 
@@ -177,8 +182,12 @@ public class MathController {
 
             model.addAttribute("result", result);
             model.addAttribute("task", task);
+            model.addAttribute("answer", answer);
             model.addAttribute("level", user.getCurrentLevel());
             model.addAttribute("isCorrect", true);
+
+            session.removeAttribute("lastAttemptsLeft");
+            session.removeAttribute("lastNewTask");
 
         } else {
             wrongInRow++;
@@ -206,18 +215,68 @@ public class MathController {
 
                 model.addAttribute("result", result);
                 model.addAttribute("task", task);
+                model.addAttribute("answer", answer);
                 model.addAttribute("level", user.getCurrentLevel());
                 model.addAttribute("isCorrect", false);
                 model.addAttribute("newTask", true);
+
+                session.setAttribute("lastNewTask", true);
+                session.removeAttribute("lastAttemptsLeft");
             } else {
                 result += " Попробуй еще раз. Осталось попыток: " + (3 - attempts);
 
                 model.addAttribute("result", result);
                 model.addAttribute("task", task);
+                model.addAttribute("answer", answer);
                 model.addAttribute("level", user.getCurrentLevel());
                 model.addAttribute("isCorrect", false);
                 model.addAttribute("attemptsLeft", 3 - attempts);
+
+                session.setAttribute("lastAttemptsLeft", 3 - attempts);
+                session.removeAttribute("lastNewTask");
             }
+        }
+
+        return "result";
+    }
+
+    @PostMapping("/dispute")
+    public String dispute(HttpSession session, Model model) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            return "redirect:/login";
+        }
+
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return "redirect:/login";
+        }
+
+        String task = (String) session.getAttribute("lastTask");
+        String answer = (String) session.getAttribute("lastAnswer");
+        String result = (String) session.getAttribute("lastResult");
+        Boolean isCorrect = (Boolean) session.getAttribute("lastIsCorrect");
+
+        if (task == null || answer == null || result == null || isCorrect == null) {
+            return "redirect:/learn";
+        }
+
+        String disputeResult = ollamaService.disputeAnswer(task, answer);
+
+        model.addAttribute("result", result);
+        model.addAttribute("task", task);
+        model.addAttribute("answer", answer);
+        model.addAttribute("level", user.getCurrentLevel());
+        model.addAttribute("isCorrect", isCorrect);
+        model.addAttribute("disputeResult", disputeResult);
+
+        Integer attemptsLeft = (Integer) session.getAttribute("lastAttemptsLeft");
+        Boolean newTask = (Boolean) session.getAttribute("lastNewTask");
+        if (attemptsLeft != null) {
+            model.addAttribute("attemptsLeft", attemptsLeft);
+        }
+        if (newTask != null) {
+            model.addAttribute("newTask", newTask);
         }
 
         return "result";

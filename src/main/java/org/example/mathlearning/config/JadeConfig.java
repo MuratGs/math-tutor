@@ -1,5 +1,6 @@
 package org.example.mathlearning.config;
 
+import org.example.mathlearning.agent.MotivatorAgent;
 import org.example.mathlearning.agent.StudentAgent;
 import org.example.mathlearning.agent.TeacherAgent;
 import jade.core.Profile;
@@ -10,6 +11,8 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.example.mathlearning.service.OllamaService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
@@ -17,6 +20,9 @@ public class JadeConfig {
 
     private static final Logger log = LoggerFactory.getLogger(JadeConfig.class);
     private AgentContainer container;
+
+    @Autowired
+    private OllamaService ollamaService;
 
     @PostConstruct
     public void startJade() {
@@ -33,6 +39,7 @@ public class JadeConfig {
 
             container.createNewAgent("Teacher", TeacherAgent.class.getName(), null).start();
             container.createNewAgent("Student", StudentAgent.class.getName(), null).start();
+            container.createNewAgent("Motivator", MotivatorAgent.class.getName(), new Object[]{ollamaService}).start();
 
             log.info("✅ JADE запущена (без GUI, агенты работают)");
         } catch (Exception e) {

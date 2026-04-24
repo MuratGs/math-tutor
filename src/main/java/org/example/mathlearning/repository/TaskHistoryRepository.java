@@ -18,31 +18,22 @@ public interface TaskHistoryRepository extends JpaRepository<TaskHistory, Long> 
 
     // ============== ПО СЕССИИ ==============
 
-    List<TaskHistory> findBySessionIdAndTopicAndSolvedTrue(String sessionId, String topic);
-    List<TaskHistory> findBySessionIdAndTopic(String sessionId, String topic);
+    List<TaskHistory> findBySessionIdAndTask_TopicAndSolvedTrue(String sessionId, String topic);
+    List<TaskHistory> findBySessionIdAndTask_Topic(String sessionId, String topic);
 
-    @Query("SELECT t FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.taskText = :taskText ORDER BY t.id DESC LIMIT 1")
-    Optional<TaskHistory> findFirstBySessionIdAndTaskText(@Param("sessionId") String sessionId, @Param("taskText") String taskText);
+    Optional<TaskHistory> findTopBySessionIdAndTask_TaskTextOrderByIdDesc(String sessionId, String taskText);
 
-    Optional<TaskHistory> findBySessionIdAndTaskText(String sessionId, String taskText);
+    boolean existsBySessionIdAndTask_TaskTextAndSolvedTrue(String sessionId, String taskText);
 
-    @Query("SELECT COUNT(t) > 0 FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.taskText = :taskText AND t.solved = true")
-    boolean isTaskSolved(@Param("sessionId") String sessionId, @Param("taskText") String taskText);
-
-    @Query("SELECT t.taskText FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.topic = :topic")
+    @Query("SELECT t.task.taskText FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.task.topic = :topic")
     List<String> findAllUsedTasks(@Param("sessionId") String sessionId, @Param("topic") String topic);
 
-    @Query("SELECT COUNT(t) FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.level = :level AND t.solved = true")
+    @Query("SELECT COUNT(t) FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.task.level = :level AND t.solved = true")
     int countSolvedByLevel(@Param("sessionId") String sessionId, @Param("level") int level);
 
     @Modifying
     @Transactional
-    @Query("UPDATE TaskHistory t SET t.attempts = t.attempts + 1 WHERE t.sessionId = :sessionId AND t.taskText = :taskText")
-    void incrementAttempts(@Param("sessionId") String sessionId, @Param("taskText") String taskText);
-
-    @Modifying
-    @Transactional
-    @Query("DELETE FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.topic = :topic AND t.level = :level")
+    @Query("DELETE FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.task.topic = :topic AND t.task.level = :level")
     void deleteBySessionIdAndTopicAndLevel(@Param("sessionId") String sessionId, @Param("topic") String topic, @Param("level") int level);
 
     @Modifying
@@ -50,34 +41,29 @@ public interface TaskHistoryRepository extends JpaRepository<TaskHistory, Long> 
     @Query("DELETE FROM TaskHistory t WHERE t.sessionId = :sessionId")
     void deleteBySessionId(@Param("sessionId") String sessionId);
 
-    @Query("SELECT COUNT(t) FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.topic = :topic AND t.solved = false")
+    @Query("SELECT COUNT(t) FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.task.topic = :topic AND t.solved = false")
     int countUnsolvedBySessionIdAndTopic(@Param("sessionId") String sessionId, @Param("topic") String topic);
 
     List<TaskHistory> findBySessionIdOrderByCreatedAtDesc(String sessionId);
 
-    @Query("SELECT t FROM TaskHistory t WHERE t.sessionId = :sessionId ORDER BY t.createdAt DESC LIMIT 1")
-    Optional<TaskHistory> findLastBySessionId(@Param("sessionId") String sessionId);
+    Optional<TaskHistory> findTopBySessionIdOrderByCreatedAtDesc(String sessionId);
 
-    @Query("SELECT COUNT(t) > 0 FROM TaskHistory t WHERE t.sessionId = :sessionId AND t.taskText = :taskText")
-    boolean existsBySessionIdAndTaskText(@Param("sessionId") String sessionId, @Param("taskText") String taskText);
+    boolean existsBySessionIdAndTask_TaskText(String sessionId, String taskText);
 
-    @Query("SELECT DISTINCT t.taskText FROM TaskHistory t WHERE t.sessionId = :sessionId")
+    @Query("SELECT DISTINCT t.task.taskText FROM TaskHistory t WHERE t.sessionId = :sessionId")
     List<String> findDistinctTasksBySessionId(@Param("sessionId") String sessionId);
 
-    @Query("SELECT t.level, COUNT(t), SUM(CASE WHEN t.solved THEN 1 ELSE 0 END) " +
-            "FROM TaskHistory t WHERE t.sessionId = :sessionId GROUP BY t.level ORDER BY t.level")
+    @Query("SELECT t.task.level, COUNT(t), SUM(CASE WHEN t.solved THEN 1 ELSE 0 END) " +
+            "FROM TaskHistory t WHERE t.sessionId = :sessionId GROUP BY t.task.level ORDER BY t.task.level")
     List<Object[]> getLevelStats(@Param("sessionId") String sessionId);
 
     // ============== НОВЫЕ МЕТОДЫ ПО ID ПОЛЬЗОВАТЕЛЯ ==============
 
-    @Query("SELECT t FROM TaskHistory t WHERE t.user.id = :userId")
-    List<TaskHistory> findByUserId(@Param("userId") Long userId);
+    List<TaskHistory> findByUser_Id(Long userId);
 
-    @Query("SELECT t FROM TaskHistory t WHERE t.user.id = :userId AND t.topic = :topic AND t.solved = true")
-    List<TaskHistory> findByUserIdAndTopicAndSolvedTrue(@Param("userId") Long userId, @Param("topic") String topic);
+    List<TaskHistory> findByUser_IdAndTask_TopicAndSolvedTrue(Long userId, String topic);
 
-    @Query("SELECT t FROM TaskHistory t WHERE t.user.id = :userId AND t.topic = :topic")
-    List<TaskHistory> findByUserIdAndTopic(@Param("userId") Long userId, @Param("topic") String topic);
+    List<TaskHistory> findByUser_IdAndTask_Topic(Long userId, String topic);
 
     @Query("SELECT t FROM TaskHistory t WHERE t.user.id = :userId ORDER BY t.createdAt DESC")
     List<TaskHistory> findRecentByUserId(@Param("userId") Long userId, Pageable pageable);
@@ -92,8 +78,8 @@ public interface TaskHistoryRepository extends JpaRepository<TaskHistory, Long> 
     @Query("SELECT COUNT(t) FROM TaskHistory t WHERE t.user.id = :userId")
     int countTotalByUserId(@Param("userId") Long userId);
 
-    @Query("SELECT t.level, COUNT(t), SUM(CASE WHEN t.solved THEN 1 ELSE 0 END) " +
-            "FROM TaskHistory t WHERE t.user.id = :userId GROUP BY t.level ORDER BY t.level")
+    @Query("SELECT t.task.level, COUNT(t), SUM(CASE WHEN t.solved THEN 1 ELSE 0 END) " +
+            "FROM TaskHistory t WHERE t.user.id = :userId GROUP BY t.task.level ORDER BY t.task.level")
     List<Object[]> getLevelStatsByUserId(@Param("userId") Long userId);
 
     @Query("SELECT AVG(t.attempts) FROM TaskHistory t WHERE t.user.id = :userId AND t.solved = true")
@@ -104,19 +90,23 @@ public interface TaskHistoryRepository extends JpaRepository<TaskHistory, Long> 
 
     @Modifying
     @Transactional
-    @Query("UPDATE TaskHistory t SET t.solved = true, t.solvedAt = CURRENT_TIMESTAMP WHERE t.user.id = :userId AND t.taskText = :taskText")
-    void markAsSolvedByUserId(@Param("userId") Long userId, @Param("taskText") String taskText);
-
-    @Modifying
-    @Transactional
-    @Query("UPDATE TaskHistory t SET t.attempts = t.attempts + 1 WHERE t.user.id = :userId AND t.taskText = :taskText")
-    void incrementAttemptsByUserId(@Param("userId") Long userId, @Param("taskText") String taskText);
-
-    @Modifying
-    @Transactional
     @Query("DELETE FROM TaskHistory t WHERE t.user.id = :userId")
     void deleteByUserId(@Param("userId") Long userId);
 
-    @Query("SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END FROM TaskHistory t WHERE t.user.id = :userId AND t.taskText = :taskText AND t.solved = true")
+    @Query("SELECT CASE WHEN COUNT(t) > 0 THEN true ELSE false END FROM TaskHistory t WHERE t.user.id = :userId AND t.task.taskText = :taskText AND t.solved = true")
     boolean isTaskSolvedByUser(@Param("userId") Long userId, @Param("taskText") String taskText);
+
+    boolean existsByUser_IdAndTask_IdAndSolvedTrue(Long userId, Long taskId);
+
+    @Query("SELECT t.task.taskText FROM TaskHistory t WHERE t.user.id = :userId AND t.task.topic = :topic AND t.task.level = :level AND t.solved = true ORDER BY t.id DESC")
+    List<String> findSolvedTaskTextsByUserIdAndTopicAndLevel(@Param("userId") Long userId,
+                                                            @Param("topic") String topic,
+                                                            @Param("level") int level,
+                                                            Pageable pageable);
+
+    default List<String> findSolvedTaskTextsByUserIdAndTopicAndLevel(Long userId, String topic, int level, int limit) {
+        return findSolvedTaskTextsByUserIdAndTopicAndLevel(userId, topic, level, PageRequest.of(0, limit));
+    }
+
+    Optional<TaskHistory> findTopByUser_IdAndTask_TaskTextOrderByIdDesc(Long userId, String taskText);
 }

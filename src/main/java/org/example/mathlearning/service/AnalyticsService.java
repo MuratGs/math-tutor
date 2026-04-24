@@ -85,7 +85,7 @@ public class AnalyticsService {
      * Определить слабые темы пользователя
      */
     public String identifyWeakTopics(Long userId) {
-        List<TaskHistory> tasks = taskHistoryRepository.findByUserId(userId);
+        List<TaskHistory> tasks = taskHistoryRepository.findByUser_Id(userId);
 
         int algebraCorrect = 0;
         int algebraTotal = 0;

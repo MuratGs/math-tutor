@@ -129,6 +129,49 @@
         margin-bottom: 0;
         padding-bottom: 0;
     }
+
+    .chat-panel {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        width: 360px;
+        max-width: calc(100vw - 40px);
+        max-height: 60vh;
+        display: none;
+        z-index: 2100;
+        background: #0f172a;
+        color: white;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,0.10);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+    }
+
+    .chat-messages {
+        background: rgba(255,255,255,0.06);
+        border-radius: 12px;
+        padding: 10px;
+        height: 260px;
+        overflow-y: auto;
+        font-size: 0.95rem;
+    }
+
+    .chat-bubble {
+        padding: 10px 12px;
+        border-radius: 12px;
+        margin-bottom: 10px;
+        border: 1px solid rgba(255,255,255,0.10);
+        word-break: break-word;
+    }
+
+    .chat-bubble.user {
+        background: white;
+        color: #0f172a;
+    }
+
+    .chat-bubble.bot {
+        background: rgba(255,255,255,0.12);
+        color: white;
+    }
   </style>
 </head>
 <body>
@@ -137,6 +180,7 @@
     <span class="navbar-brand">MathLearn</span>
     <div>
       <a href="/learn" class="btn btn-outline-light me-2">Обучение</a>
+      <button type="button" class="btn btn-outline-light me-2" id="chatToggleMenu">Мотиватор</button>
       <a href="/logout" class="btn btn-outline-light">Выйти</a>
     </div>
   </div>
@@ -280,7 +324,7 @@
 
       <!-- Кнопки действий -->
       <div class="d-flex gap-2 mt-3">
-        <a href="/learn" class="btn btn-primary flex-grow-1">Продолжить обучение</a>
+        <a href="/learn" class="btn btn-primary flex-grow-1" id="continueLearningBtn">Продолжить обучение</a>
         <a href="/reset" class="btn btn-outline-secondary"
            onclick="return confirm('Весь прогресс будет сброшен. Вы уверены?')">
           Сбросить
@@ -289,5 +333,140 @@
     </div>
   </div>
 </main>
+
+<div class="loading-overlay" id="loadingOverlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.45); z-index:2000; align-items:center; justify-content:center;">
+  <div class="loading-card text-center" style="background:white; border-radius:14px; padding:22px 24px; width:min(360px, calc(100vw - 32px)); box-shadow:0 10px 30px rgba(0,0,0,0.18);">
+    <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+    <div class="mt-3 fw-medium" id="loadingText">Загрузка…</div>
+    <div class="text-secondary small mt-1">Это может занять несколько секунд</div>
+  </div>
+</div>
+
+<div class="card p-3 chat-panel" id="chatPanel">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="fw-medium">Чат-мотиватор</div>
+    <button type="button" class="btn btn-outline-light btn-sm" id="chatClose">Закрыть</button>
+  </div>
+  <div class="chat-messages mb-2" id="chatMessages"></div>
+  <div class="input-group">
+    <input type="text" class="form-control" id="chatInput" placeholder="Напиши…">
+    <button type="button" class="btn btn-primary" id="chatSend">Отправить</button>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const overlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    const continueBtn = document.getElementById('continueLearningBtn');
+
+    function showLoading(text) {
+      if (loadingText) loadingText.textContent = text;
+      if (overlay) overlay.style.display = 'flex';
+    }
+
+    function wireLink(el, text) {
+      if (!el) return;
+      el.addEventListener('click', function (e) {
+        e.preventDefault();
+        showLoading(text);
+        const href = el.getAttribute('href');
+        setTimeout(function () {
+          window.location.href = href;
+        }, 50);
+      });
+    }
+
+    wireLink(continueBtn, 'Генерирую задачу…');
+  })();
+</script>
+
+<script>
+  (function () {
+    const toggle = document.getElementById('chatToggleMenu');
+    const panel = document.getElementById('chatPanel');
+    const closeBtn = document.getElementById('chatClose');
+    const messagesEl = document.getElementById('chatMessages');
+    const input = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('chatSend');
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function appendMessage(role, text) {
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble ' + (role === 'user' ? 'user' : 'bot');
+      bubble.innerHTML = escapeHtml(text);
+      messagesEl.appendChild(bubble);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function openChat() {
+      if (!panel) return;
+      panel.style.display = 'block';
+      if (messagesEl && messagesEl.children.length === 0) {
+        appendMessage('assistant', 'Я рядом. Хочешь мотивацию или помочь не бросить обучение?');
+      }
+      setTimeout(function () { input && input.focus(); }, 50);
+    }
+
+    function closeChat() {
+      if (!panel) return;
+      panel.style.display = 'none';
+    }
+
+    function toggleChat() {
+      if (!panel) return;
+      if (panel.style.display === 'block') closeChat();
+      else openChat();
+    }
+
+    async function sendMessage() {
+      const text = (input.value || '').trim();
+      if (!text) return;
+
+      input.value = '';
+      appendMessage('user', text);
+      sendBtn.disabled = true;
+      appendMessage('assistant', 'Думаю…');
+
+      try {
+        const resp = await fetch('/api/motivator/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            page: 'profile',
+            task: null
+          })
+        });
+        const data = await resp.json();
+        const reply = (data && data.reply) ? data.reply : 'Не получилось ответить.';
+        messagesEl.removeChild(messagesEl.lastChild);
+        appendMessage('assistant', reply);
+      } catch (e) {
+        messagesEl.removeChild(messagesEl.lastChild);
+        appendMessage('assistant', 'Не получилось ответить. Попробуй ещё раз.');
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    if (toggle) toggle.addEventListener('click', toggleChat);
+    if (closeBtn) closeBtn.addEventListener('click', closeChat);
+    if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+    if (input) {
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+    }
+  })();
+</script>
 </body>
 </html>
