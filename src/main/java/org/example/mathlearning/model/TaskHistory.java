@@ -18,14 +18,9 @@ public class TaskHistory {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @Column(name = "topic", nullable = false)
-    private String topic;
-
-    @Column(name = "task_text", nullable = false, length = 1000)
-    private String taskText;
-
-    @Column(name = "level", nullable = false)
-    private Integer level;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "task_id")
+    private MathTask task;
 
     @Column(name = "solved")
     private Boolean solved = false;
@@ -42,24 +37,20 @@ public class TaskHistory {
     // Конструкторы
     public TaskHistory() {}
 
-    public TaskHistory(String sessionId, String topic, String taskText, Integer level) {
+    public TaskHistory(String sessionId, MathTask task) {
         this.sessionId = sessionId;
-        this.topic = topic;
-        this.taskText = taskText;
-        this.level = level;
+        this.task = task;
         this.solved = false;
-        this.attempts = 1;
+        this.attempts = 0;
         this.createdAt = LocalDateTime.now();
     }
 
-    public TaskHistory(String sessionId, User user, String topic, String taskText, Integer level) {
+    public TaskHistory(String sessionId, User user, MathTask task) {
         this.sessionId = sessionId;
         this.user = user;
-        this.topic = topic;
-        this.taskText = taskText;
-        this.level = level;
+        this.task = task;
         this.solved = false;
-        this.attempts = 1;
+        this.attempts = 0;
         this.createdAt = LocalDateTime.now();
     }
 
@@ -73,18 +64,18 @@ public class TaskHistory {
     public User getUser() { return user; }
     public void setUser(User user) { this.user = user; }
 
+    public MathTask getTask() { return task; }
+    public void setTask(MathTask task) { this.task = task; }
+
     public Long getUserId() {
         return user != null ? user.getId() : null;
     }
 
-    public String getTopic() { return topic; }
-    public void setTopic(String topic) { this.topic = topic; }
+    public String getTopic() { return task != null ? task.getTopic() : null; }
 
-    public String getTaskText() { return taskText; }
-    public void setTaskText(String taskText) { this.taskText = taskText; }
+    public String getTaskText() { return task != null ? task.getTaskText() : ""; }
 
-    public Integer getLevel() { return level; }
-    public void setLevel(Integer level) { this.level = level; }
+    public Integer getLevel() { return task != null ? task.getLevel() : null; }
 
     public Boolean getSolved() { return solved; }
     public void setSolved(Boolean solved) {

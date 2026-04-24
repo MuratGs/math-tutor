@@ -1,7 +1,9 @@
 package org.example.mathlearning.service;
 
+import org.example.mathlearning.model.MathTask;
 import org.example.mathlearning.model.TaskHistory;
 import org.example.mathlearning.model.User;
+import org.example.mathlearning.repository.MathTaskRepository;
 import org.example.mathlearning.repository.TaskHistoryRepository;
 import org.example.mathlearning.repository.UserRepository;
 import org.slf4j.Logger;
@@ -22,6 +24,9 @@ public class OllamaService {
 
     @Autowired
     private TaskHistoryRepository taskHistoryRepository;
+
+    @Autowired
+    private MathTaskRepository mathTaskRepository;
 
     @Autowired
     private UserRepository userRepository;  // Добавлено для получения пользователя
@@ -50,6 +55,16 @@ public class OllamaService {
 
         String topicRu = topic.equals("algebra") ? "алгебре" : "геометрии";
 
+        User user = null;
+        if (userId != null) {
+            user = userRepository.findById(userId).orElse(null);
+        }
+
+        List<String> recentSolvedTasks = Collections.emptyList();
+        if (user != null) {
+            recentSolvedTasks = taskHistoryRepository.findSolvedTaskTextsByUserIdAndTopicAndLevel(user.getId(), topic, level, 20);
+        }
+
         String prompt = String.format(
                 "Ты - учитель математики в российской школе. Придумай математическую задачу по %s для %d класса.\n\n" +
                         "ТРЕБОВАНИЯ К ЗАДАЧЕ:\n" +
@@ -59,29 +74,45 @@ public class OllamaService {
                         "4. Уровень сложности %d из 5\n\n" +
                         "ПРИМЕРЫ ЗАДАЧ ДЛЯ ЭТОГО УРОВНЯ:\n" +
                         "%s\n\n" +
+                        "ВАЖНО: не повторяй задачи, которые ученик уже решал успешно.\n" +
                         "Придумай свою уникальную задачу, непохожую на примеры. Напиши только условие:",
                 topicRu, level, level, getExamplesForLevel(topic, level)
         );
 
-        try {
-            String task = callOllama(prompt);
-            task = cleanTask(task);
+        if (user != null && !recentSolvedTasks.isEmpty()) {
+            prompt = prompt + "\n\nУченик уже решал успешно (не повторяй):\n" + String.join("\n", recentSolvedTasks);
+        }
 
-            if (task.length() > 15) {
+        try {
+            int maxGenerationAttempts = 6;
+            for (int i = 0; i < maxGenerationAttempts; i++) {
+                String task = callOllama(prompt);
+                task = cleanTask(task);
+
+                if (task.length() <= 15) {
+                    continue;
+                }
+
+                if (taskHistoryRepository.existsBySessionIdAndTask_TaskText(sessionId, task)) {
+                    log.debug("Сгенерирована повторяющаяся задача в рамках сессии, пробую ещё раз");
+                    continue;
+                }
+
+                MathTask mathTask = getOrCreateMathTask(topic, level, task);
+
+                if (user != null && mathTask.getId() != null) {
+                    boolean alreadySolved = taskHistoryRepository.existsByUser_IdAndTask_IdAndSolvedTrue(user.getId(), mathTask.getId());
+                    if (alreadySolved) {
+                        log.debug("Пользователь {} уже решал эту задачу успешно, пробую сгенерировать другую", user.getId());
+                        continue;
+                    }
+                }
+
                 log.info("✅ Задача сгенерирована: {}", task);
 
-                TaskHistory history;
-                if (userId != null) {
-                    // Получаем пользователя из БД
-                    User user = userRepository.findById(userId).orElse(null);
-                    if (user != null) {
-                        history = new TaskHistory(sessionId, user, topic, task, level);
-                    } else {
-                        history = new TaskHistory(sessionId, topic, task, level);
-                    }
-                } else {
-                    history = new TaskHistory(sessionId, topic, task, level);
-                }
+                TaskHistory history = (user != null)
+                        ? new TaskHistory(sessionId, user, mathTask)
+                        : new TaskHistory(sessionId, mathTask);
                 taskHistoryRepository.save(history);
                 return task;
             }
@@ -89,20 +120,30 @@ public class OllamaService {
             log.error("❌ Ошибка генерации: {}", e.getMessage());
         }
 
+        List<String> fallbackTasks = getRussianFallbackTasks(topic, level);
+        for (String fallbackTask : fallbackTasks) {
+            MathTask fallbackMathTask = getOrCreateMathTask(topic, level, fallbackTask);
+            if (user != null && fallbackMathTask.getId() != null) {
+                boolean alreadySolved = taskHistoryRepository.existsByUser_IdAndTask_IdAndSolvedTrue(user.getId(), fallbackMathTask.getId());
+                if (alreadySolved) {
+                    continue;
+                }
+            }
+
+            log.info("📚 Использую запасную задачу: {}", fallbackTask);
+            TaskHistory history = (user != null)
+                    ? new TaskHistory(sessionId, user, fallbackMathTask)
+                    : new TaskHistory(sessionId, fallbackMathTask);
+            taskHistoryRepository.save(history);
+            return fallbackTask;
+        }
+
         String fallbackTask = getRussianFallbackTask(topic, level);
         log.info("📚 Использую запасную задачу: {}", fallbackTask);
-
-        TaskHistory history;
-        if (userId != null) {
-            User user = userRepository.findById(userId).orElse(null);
-            if (user != null) {
-                history = new TaskHistory(sessionId, user, topic, fallbackTask, level);
-            } else {
-                history = new TaskHistory(sessionId, topic, fallbackTask, level);
-            }
-        } else {
-            history = new TaskHistory(sessionId, topic, fallbackTask, level);
-        }
+        MathTask fallbackMathTask = getOrCreateMathTask(topic, level, fallbackTask);
+        TaskHistory history = (user != null)
+                ? new TaskHistory(sessionId, user, fallbackMathTask)
+                : new TaskHistory(sessionId, fallbackMathTask);
         taskHistoryRepository.save(history);
         return fallbackTask;
     }
@@ -125,12 +166,18 @@ public class OllamaService {
                 "Ты - учитель математики. Проверь ответ ученика.\n\n" +
                         "Задача: %s\n" +
                         "Ответ ученика: %s\n\n" +
+                        "ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА СРАВНЕНИЯ ОТВЕТА (НЕ НАРУШАЙ):\n" +
+                        "1. Никогда не считай ответ неверным только из-за формата записи (пробелы, запятые, слова, единицы измерения).\n" +
+                        "2. Десятичные дроби: запятая и точка эквивалентны (12,4 = 12.4).\n" +
+                        "3. Если по условию требуется ДВА значения (например: 'длина и ширина', 'x и y', 'два числа'),\n" +
+                        "   то ответ вида '3,8' / '3 8' / '3;8' трактуй как ДВА числа {3 и 8}, а НЕ как десятичную дробь 3.8.\n" +
+                        "4. Если порядок значений не указан явно, принимай любой порядок (например 3,8 = 8,3).\n\n" +
                         "ИНСТРУКЦИЯ ПО ПРОВЕРКЕ:\n" +
                         "1. Сначала РЕШИ ЭТУ ЗАДАЧУ САМОСТОЯТЕЛЬНО. Выполни все вычисления шаг за шагом.\n" +
                         "2. Запиши свой вычисленный ответ.\n" +
                         "3. Сравни свой ответ с ответом ученика.\n" +
                         "4. Если ответ правильный - напиши только: ✅ Правильно! Молодец!\n" +
-                        "5. Если ответ неправильный - напиши только: ❌ Неправильно. Правильный ответ: [число]\n\n" +
+                        "5. Если ответ неправильный - напиши только: ❌ Неправильно. Правильный ответ: [число или числа]\n\n" +
                         "ВАЖНО: Ты обязан выполнить вычисления самостоятельно, а не просто оценивать ответ ученика.\n\n" +
                         "Твой ответ:",
                 task, answer
@@ -157,6 +204,46 @@ public class OllamaService {
         return localCheck(task, answer);
     }
 
+    public String disputeAnswer(String task, String answer) {
+        log.info("🤖 Перепроверка ответа (оспаривание)...");
+        log.info("Задача: {}", task);
+        log.info("Ответ: {}", answer);
+
+        String prompt = String.format(
+                "Ты - строгий, но справедливый учитель математики. Ученик оспаривает проверку ответа.\n\n" +
+                        "Задача: %s\n" +
+                        "Ответ ученика: %s\n\n" +
+                        "ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА (НЕ НАРУШАЙ):\n" +
+                        "1. Запрещено объявлять ответ неверным только из-за оформления (пробелы, запятые, единицы измерения, слова).\n" +
+                        "2. Десятичные дроби: 12,4 и 12.4 — одно и то же число.\n" +
+                        "3. Если по смыслу задачи требуется НЕ ОДНО число (например 'длина и ширина'),\n" +
+                        "   то ответ вида '3,8' / '3 8' / '3;8' трактуй как два числа {3 и 8}, а НЕ как десятичную дробь 3.8.\n" +
+                        "4. Если порядок значений не указан, принимай любой порядок.\n" +
+                        "5. Перед вердиктом обязательно распарсь ответ ученика в список чисел и явно выпиши: 'Я распознал числа: ...'.\n\n" +
+                        "ИНСТРУКЦИЯ:\n" +
+                        "1. Реши задачу полностью сам, шаг за шагом.\n" +
+                        "2. Сформулируй корректный ответ.\n" +
+                        "3. Сравни с ответом ученика.\n" +
+                        "5. Если ответ ученика верный (в том числе из-за формата записи) - напиши: ✅ Пересмотр: ответ верный.\n" +
+                        "6. Если ответ неверный - напиши: ❌ Пересмотр: ответ неверный.\n" +
+                        "7. В случае неверного ответа дай развернутое объяснение: где ошибка, как правильно решить, и какой правильный ответ.\n\n" +
+                        "Формат ответа:\n" +
+                        "- Вердикт (первая строка)\n" +
+                        "- Я распознал числа (вторая строка)\n" +
+                        "- Решение (коротко, но понятно)\n" +
+                        "- Сравнение ответа ученика с правильным\n" +
+                        "- Итог\n",
+                task, answer
+        );
+
+        try {
+            return callOllama(prompt);
+        } catch (Exception e) {
+            log.error("❌ Ошибка перепроверки: {}", e.getMessage());
+            return "❌ Не удалось перепроверить ответ. Попробуй еще раз позже.";
+        }
+    }
+
     // ==================== УПРАВЛЕНИЕ ПОПЫТКАМИ ====================
 
     @Transactional
@@ -166,7 +253,7 @@ public class OllamaService {
 
     @Transactional
     public void incrementTaskAttempts(String sessionId, String taskText, Long userId) {
-        Optional<TaskHistory> bySession = taskHistoryRepository.findFirstBySessionIdAndTaskText(sessionId, taskText);
+        Optional<TaskHistory> bySession = taskHistoryRepository.findTopBySessionIdAndTask_TaskTextOrderByIdDesc(sessionId, taskText);
         if (bySession.isPresent()) {
             TaskHistory history = bySession.get();
             history.setAttempts(history.getAttempts() + 1);
@@ -175,8 +262,13 @@ public class OllamaService {
         }
 
         if (userId != null) {
-            taskHistoryRepository.incrementAttemptsByUserId(userId, taskText);
-            log.debug("Увеличено число попыток для пользователя {} по задаче: {}", userId, taskText);
+            Optional<TaskHistory> byUser = taskHistoryRepository.findTopByUser_IdAndTask_TaskTextOrderByIdDesc(userId, taskText);
+            if (byUser.isPresent()) {
+                TaskHistory history = byUser.get();
+                history.setAttempts(history.getAttempts() + 1);
+                taskHistoryRepository.save(history);
+                log.debug("Увеличено число попыток для пользователя {} по задаче: {}", userId, taskText);
+            }
         }
     }
 
@@ -189,9 +281,19 @@ public class OllamaService {
 
     @Transactional
     public void markTaskAsSolved(String sessionId, String taskText, Long userId) {
-        Optional<TaskHistory> bySession = taskHistoryRepository.findFirstBySessionIdAndTaskText(sessionId, taskText);
+        Optional<TaskHistory> bySession = taskHistoryRepository.findTopBySessionIdAndTask_TaskTextOrderByIdDesc(sessionId, taskText);
         if (bySession.isPresent()) {
             TaskHistory history = bySession.get();
+
+            if (userId != null && history.getTask() != null && history.getTask().getId() != null && Boolean.FALSE.equals(history.getSolved())) {
+                boolean alreadySolved = taskHistoryRepository.existsByUser_IdAndTask_IdAndSolvedTrue(userId, history.getTask().getId());
+                if (alreadySolved) {
+                    taskHistoryRepository.delete(history);
+                    log.info("Задача уже была решена пользователем ранее, дубликат в истории удалён: {}", taskText);
+                    return;
+                }
+            }
+
             history.setSolved(true);
             taskHistoryRepository.save(history);
             log.info("Задача отмечена как решенная по сессии: {}", taskText);
@@ -199,12 +301,36 @@ public class OllamaService {
         }
 
         if (userId != null) {
-            taskHistoryRepository.markAsSolvedByUserId(userId, taskText);
-            log.info("Задача отмечена как решенная для пользователя {}: {}", userId, taskText);
+            Optional<TaskHistory> byUser = taskHistoryRepository.findTopByUser_IdAndTask_TaskTextOrderByIdDesc(userId, taskText);
+            if (byUser.isPresent()) {
+                TaskHistory history = byUser.get();
+
+                if (history.getTask() != null && history.getTask().getId() != null && Boolean.FALSE.equals(history.getSolved())) {
+                    boolean alreadySolved = taskHistoryRepository.existsByUser_IdAndTask_IdAndSolvedTrue(userId, history.getTask().getId());
+                    if (alreadySolved) {
+                        taskHistoryRepository.delete(history);
+                        log.info("Задача уже была решена пользователем ранее, дубликат в истории удалён: {}", taskText);
+                        return;
+                    }
+                }
+
+                history.setSolved(true);
+                taskHistoryRepository.save(history);
+                log.info("Задача отмечена как решенная для пользователя {}: {}", userId, taskText);
+            }
         }
     }
 
+    private MathTask getOrCreateMathTask(String topic, int level, String taskText) {
+        return mathTaskRepository.findByTopicAndLevelAndTaskText(topic, level, taskText)
+                .orElseGet(() -> mathTaskRepository.save(new MathTask(topic, level, taskText)));
+    }
+
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
+
+    public String askModel(String prompt) {
+        return callOllama(prompt);
+    }
 
     private String callOllama(String prompt) {
         Map<String, Object> request = new HashMap<>();
@@ -224,10 +350,10 @@ public class OllamaService {
     }
 
     private String extractCorrectAnswer(String response) {
-        Pattern pattern = Pattern.compile("\\d+(\\.\\d+)?");
+        Pattern pattern = Pattern.compile("\\d+(?:[\\.,]\\d+)?");
         Matcher matcher = pattern.matcher(response);
         if (matcher.find()) {
-            return matcher.group();
+            return matcher.group().replace(',', '.');
         }
         return null;
     }
@@ -237,8 +363,11 @@ public class OllamaService {
     }
 
     private boolean compareAnswers(String userAnswer, String correctAnswer) {
-        String cleanUser = userAnswer.trim().replaceAll("\\s+", "");
-        String cleanCorrect = correctAnswer.trim().replaceAll("\\s+", "");
+        String normalizedUser = userAnswer == null ? "" : userAnswer.trim().replace(',', '.');
+        String normalizedCorrect = correctAnswer == null ? "" : correctAnswer.trim().replace(',', '.');
+
+        String cleanUser = normalizedUser.replaceAll("\\s+", "");
+        String cleanCorrect = normalizedCorrect.replaceAll("\\s+", "");
 
         if (cleanUser.equals(cleanCorrect)) {
             return true;
@@ -314,6 +443,70 @@ public class OllamaService {
                 case 5: return "Найди объем шара радиусом 3";
                 default: return "Найди периметр квадрата со стороной 4";
             }
+        }
+    }
+
+    private List<String> getRussianFallbackTasks(String topic, int level) {
+        if (topic.equals("algebra")) {
+            switch (level) {
+                case 1: return Arrays.asList(
+                        "Сколько будет 2 + 2?",
+                        "Сколько будет 3 + 5?",
+                        "Сколько будет 7 - 2?",
+                        "Сколько будет 6 + 4?"
+                );
+                case 2: return Arrays.asList(
+                        "Реши уравнение: x + 3 = 8",
+                        "Реши уравнение: x - 4 = 9",
+                        "Реши уравнение: x + 7 = 15",
+                        "Реши уравнение: x - 6 = 11"
+                );
+                case 3: return Arrays.asList(
+                        "Реши уравнение: 2x + 3 = 11",
+                        "Реши уравнение: 3x - 7 = 14",
+                        "Реши уравнение: 2x - 5 = 9"
+                );
+                case 4: return Arrays.asList(
+                        "Реши уравнение: 2(x + 3) = 16",
+                        "Реши уравнение: 3(x - 2) = 12",
+                        "Реши уравнение: 4(x + 1) = 20"
+                );
+                case 5: return Arrays.asList(
+                        "Реши уравнение: x² - 5x + 6 = 0",
+                        "Реши уравнение: x² - 7x + 12 = 0",
+                        "Реши уравнение: x² - 9x + 20 = 0"
+                );
+                default: return Collections.singletonList(getRussianFallbackTask(topic, level));
+            }
+        }
+
+        switch (level) {
+            case 1: return Arrays.asList(
+                    "Найди периметр квадрата со стороной 4",
+                    "Найди периметр прямоугольника со сторонами 6 и 2",
+                    "Найди площадь прямоугольника 5×3"
+            );
+            case 2: return Arrays.asList(
+                    "Найди площадь прямоугольника со сторонами 5 и 3",
+                    "Найди площадь прямоугольника со сторонами 7 и 4",
+                    "Вычисли длину окружности радиусом 4 (π≈3.14)"
+            );
+            case 3: return Arrays.asList(
+                    "Найди гипотенузу треугольника с катетами 3 и 4",
+                    "Найди гипотенузу треугольника с катетами 6 и 8",
+                    "Найди объем куба со стороной 5"
+            );
+            case 4: return Arrays.asList(
+                    "Найди объем прямоугольного параллелепипеда 3×4×5",
+                    "Найди площадь трапеции с основаниями 4 и 6 и высотой 3",
+                    "Вычисли объем цилиндра радиусом 2 и высотой 5 (π≈3.14)"
+            );
+            case 5: return Arrays.asList(
+                    "Найди объем шара радиусом 3 (π≈3.14)",
+                    "Вычисли площадь поверхности сферы радиусом 4 (π≈3.14)",
+                    "Найди объем конуса радиусом 3 и высотой 6 (π≈3.14)"
+            );
+            default: return Collections.singletonList(getRussianFallbackTask(topic, level));
         }
     }
 

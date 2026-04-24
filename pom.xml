@@ -26,6 +26,11 @@
             <name>Maven Central</name>
             <url>https://repo1.maven.org/maven2</url>
         </repository>
+        <repository>
+            <id>tilab</id>
+            <name>JADE TILAB Repository</name>
+            <url>https://jade.tilab.com/maven/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -58,6 +63,17 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.liquibase</groupId>
+            <artifactId>liquibase-core</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.tilab.jade</groupId>
+            <artifactId>jade</artifactId>
+            <version>4.6.0</version>
         </dependency>
 
         <!-- Тестовые зависимости -->
