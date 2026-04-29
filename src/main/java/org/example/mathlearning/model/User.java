@@ -41,6 +41,9 @@ public class User {
     @Column(name = "total_attempts")
     private Integer totalAttempts = 0;
 
+    @Column(name = "is_admin")
+    private Boolean admin = false;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<TaskHistory> taskHistories;
 
@@ -68,6 +71,9 @@ public class User {
 
     public Integer getTotalAttempts() { return totalAttempts; }
     public void setTotalAttempts(Integer totalAttempts) { this.totalAttempts = totalAttempts; }
+
+    public Boolean getAdmin() { return admin; }
+    public void setAdmin(Boolean admin) { this.admin = admin; }
 
     public List<TaskHistory> getTaskHistories() { return taskHistories; }
     public void setTaskHistories(List<TaskHistory> taskHistories) { this.taskHistories = taskHistories; }

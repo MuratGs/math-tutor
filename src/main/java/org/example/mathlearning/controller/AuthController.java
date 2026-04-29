@@ -89,6 +89,7 @@ public class AuthController {
             session.setAttribute("userId", userOpt.get().getId());
             session.setAttribute("username", userOpt.get().getUsername());
             session.setAttribute("userLevel", userOpt.get().getCurrentLevel());
+            session.setAttribute("isAdmin", Boolean.TRUE.equals(userOpt.get().getAdmin()));
             session.setAttribute("correctInRow", 0);
             session.setAttribute("wrongInRow", 0);
             return "redirect:/profile";
@@ -109,6 +110,8 @@ public class AuthController {
         if (user == null) {
             return "redirect:/login";
         }
+
+        session.setAttribute("isAdmin", Boolean.TRUE.equals(user.getAdmin()));
 
         // Добавляем все необходимые атрибуты для профиля
         model.addAttribute("user", user);

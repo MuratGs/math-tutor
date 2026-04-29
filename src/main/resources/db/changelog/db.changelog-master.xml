@@ -7,5 +7,6 @@
 
     <include file="db/changelog/001-baseline.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/002-normalize-taskhistory.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/003-add-admin-flag.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

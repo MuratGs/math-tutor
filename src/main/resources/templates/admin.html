@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>MathLearn — админка</title>
+  <link rel="stylesheet" href="/webjars/bootstrap/5.3.0/css/bootstrap.min.css">
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background-color: #f9fafc;
+      color: #1e293b;
+    }
+    .navbar {
+      background-color: white !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border-bottom: 1px solid #e9edf2;
+    }
+    .navbar-brand {
+      color: #0f172a !important;
+      font-weight: 600;
+    }
+    .btn-outline-light {
+      color: #475569;
+      border-color: #e2e8f0;
+      background: white;
+    }
+    .btn-outline-light:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
+    .card {
+      border: 1px solid #e9edf2;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      background: white;
+    }
+    .stat-card {
+      padding: 18px;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #ffffff, #fafbfc);
+      border: 1px solid #e9edf2;
+    }
+    .stat-value {
+      font-size: 1.9rem;
+      font-weight: 650;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+    .stat-label {
+      color: #64748b;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .table {
+      font-size: 0.95rem;
+    }
+    .table th {
+      font-weight: 500;
+      color: #64748b;
+      border-bottom-width: 1px;
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <span class="navbar-brand">MathLearn</span>
+    <div>
+      <a href="/profile" class="btn btn-outline-light me-2">Профиль</a>
+      <a href="/learn" class="btn btn-outline-light me-2">Обучение</a>
+      <a href="/logout" class="btn btn-outline-light">Выйти</a>
+    </div>
+  </div>
+</nav>
+
+<main class="container mt-4">
+  <div class="mb-4">
+    <h2 class="fw-semibold" style="color: #0f172a;">Админ-панель</h2>
+    <p class="text-secondary">Сводная статистика пользователей и обучения</p>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="stat-card text-center">
+        <div class="stat-value" th:text="${totalUsers}">0</div>
+        <div class="stat-label">Пользователей</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="stat-card text-center">
+        <div class="stat-value" th:text="${#numbers.formatDecimal(overallSuccessRate, 1, 1)} + '%'"></div>
+        <div class="stat-label">Успешность (в целом)</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="stat-card text-center">
+        <div class="stat-value" th:text="${newUsers7d}">0</div>
+        <div class="stat-label">Новых за 7 дней</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="card p-4">
+        <h5 class="mb-3" style="font-weight: 500;">Пользователи по уровню</h5>
+        <table class="table mb-0">
+          <thead>
+          <tr>
+            <th>Уровень</th>
+            <th>Пользователей</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr th:each="lvl : ${#numbers.sequence(1,5)}">
+            <td th:text="'Уровень ' + ${lvl}"></td>
+            <td th:text="${usersByLevel[lvl]}"></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card p-4 mt-3">
+        <h5 class="mb-3" style="font-weight: 500;">Топ по решённым задачам</h5>
+        <div th:if="${topSolvedUsers.empty}" class="text-secondary">Нет данных</div>
+        <table th:unless="${topSolvedUsers.empty}" class="table mb-0">
+          <thead>
+          <tr>
+            <th>Пользователь</th>
+            <th>Решено</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr th:each="u : ${topSolvedUsers}">
+            <td th:text="${u.username}"></td>
+            <td th:text="${u.solved}"></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card p-4">
+        <h5 class="mb-3" style="font-weight: 500;">Новые пользователи</h5>
+        <div th:if="${recentUsers.empty}" class="text-secondary">Нет данных</div>
+        <div th:unless="${recentUsers.empty}" class="table-responsive">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>Имя</th>
+              <th>Email</th>
+              <th>Уровень</th>
+              <th>Правильно</th>
+              <th>Попыток</th>
+              <th>Дата</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="u : ${recentUsers}">
+              <td th:text="${u.username}"></td>
+              <td class="text-secondary" th:text="${u.email}"></td>
+              <td th:text="${u.currentLevel}"></td>
+              <td th:text="${u.totalCorrect}"></td>
+              <td th:text="${u.totalAttempts}"></td>
+              <td class="text-secondary small" th:text="${#temporals.format(u.createdAt, 'dd MMM yyyy')}"></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-4 mt-3">
+        <h5 class="mb-3" style="font-weight: 500;">Последние решённые задачи</h5>
+        <div th:if="${recentSolved.empty}" class="text-secondary">Нет данных</div>
+        <div th:unless="${recentSolved.empty}" class="table-responsive">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>Пользователь</th>
+              <th>Тема</th>
+              <th>Уровень</th>
+              <th>Попыток</th>
+              <th>Задача</th>
+              <th>Дата</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="t : ${recentSolved}">
+              <td th:text="${t.user.username}"></td>
+              <td th:text="${t.topic == 'algebra' ? 'Алгебра' : 'Геометрия'}"></td>
+              <td th:text="${t.level}"></td>
+              <td th:text="${t.attempts}"></td>
+              <td>
+                <span th:text="${t.taskText.length() > 60 ? t.taskText.substring(0,60) + '…' : t.taskText}"></span>
+              </td>
+              <td class="text-secondary small" th:text="${#temporals.format(t.createdAt, 'dd MMM HH:mm')}"></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

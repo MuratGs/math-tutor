@@ -168,6 +168,7 @@
         <span class="navbar-brand">MathLearn</span>
         <div>
             <button type="button" class="btn btn-outline-light me-2" id="chatToggleMenu">Мотиватор</button>
+            <a href="/admin" class="btn btn-outline-light me-2" th:if="${session.isAdmin}">Админка</a>
             <a href="/profile" class="btn btn-outline-light me-2">Профиль</a>
             <a href="/logout" class="btn btn-outline-light">Выйти</a>
         </div>

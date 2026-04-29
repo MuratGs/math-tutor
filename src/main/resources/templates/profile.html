@@ -181,6 +181,7 @@
     <div>
       <a href="/learn" class="btn btn-outline-light me-2">Обучение</a>
       <button type="button" class="btn btn-outline-light me-2" id="chatToggleMenu">Мотиватор</button>
+      <a href="/admin" class="btn btn-outline-light me-2" th:if="${session.isAdmin}">Админка</a>
       <a href="/logout" class="btn btn-outline-light">Выйти</a>
     </div>
   </div>

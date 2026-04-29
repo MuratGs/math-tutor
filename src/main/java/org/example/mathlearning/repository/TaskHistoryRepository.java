@@ -109,4 +109,18 @@ public interface TaskHistoryRepository extends JpaRepository<TaskHistory, Long> 
     }
 
     Optional<TaskHistory> findTopByUser_IdAndTask_TaskTextOrderByIdDesc(Long userId, String taskText);
+
+    @Query("SELECT t.user.id, t.user.username, COUNT(t) FROM TaskHistory t WHERE t.solved = true GROUP BY t.user.id, t.user.username ORDER BY COUNT(t) DESC")
+    List<Object[]> findTopSolvedUsers(Pageable pageable);
+
+    default List<Object[]> findTopSolvedUsers(int limit) {
+        return findTopSolvedUsers(PageRequest.of(0, limit));
+    }
+
+    @Query("SELECT t FROM TaskHistory t WHERE t.solved = true ORDER BY t.createdAt DESC")
+    List<TaskHistory> findRecentSolved(Pageable pageable);
+
+    default List<TaskHistory> findRecentSolved(int limit) {
+        return findRecentSolved(PageRequest.of(0, limit));
+    }
 }
