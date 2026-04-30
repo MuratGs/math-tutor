@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="008-1-seed-topic-graph-defaults" author="cascade" runInTransaction="true">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="topic_graph"/>
+                <sqlCheck expectedResult="0">SELECT COUNT(*) FROM topic_graph;</sqlCheck>
+            </and>
+        </preConditions>
+
+        <insert tableName="topic_graph">
+            <column name="topic" value="fractions"/>
+            <column name="related_topic" value="percent"/>
+            <column name="relation_strength" valueNumeric="0.9"/>
+        </insert>
+        <insert tableName="topic_graph">
+            <column name="topic" value="fractions"/>
+            <column name="related_topic" value="decimals"/>
+            <column name="relation_strength" valueNumeric="0.85"/>
+        </insert>
+        <insert tableName="topic_graph">
+            <column name="topic" value="fractions"/>
+            <column name="related_topic" value="ratios"/>
+            <column name="relation_strength" valueNumeric="0.8"/>
+        </insert>
+
+        <insert tableName="topic_graph">
+            <column name="topic" value="percent"/>
+            <column name="related_topic" value="fractions"/>
+            <column name="relation_strength" valueNumeric="0.9"/>
+        </insert>
+        <insert tableName="topic_graph">
+            <column name="topic" value="percent"/>
+            <column name="related_topic" value="ratios"/>
+            <column name="relation_strength" valueNumeric="0.75"/>
+        </insert>
+
+        <insert tableName="topic_graph">
+            <column name="topic" value="equations"/>
+            <column name="related_topic" value="expressions"/>
+            <column name="relation_strength" valueNumeric="0.85"/>
+        </insert>
+        <insert tableName="topic_graph">
+            <column name="topic" value="equations"/>
+            <column name="related_topic" value="integers"/>
+            <column name="relation_strength" valueNumeric="0.7"/>
+        </insert>
+
+        <insert tableName="topic_graph">
+            <column name="topic" value="speed_time_distance"/>
+            <column name="related_topic" value="word_problems"/>
+            <column name="relation_strength" valueNumeric="0.85"/>
+        </insert>
+        <insert tableName="topic_graph">
+            <column name="topic" value="speed_time_distance"/>
+            <column name="related_topic" value="equations"/>
+            <column name="relation_strength" valueNumeric="0.7"/>
+        </insert>
+
+        <insert tableName="topic_graph">
+            <column name="topic" value="word_problems"/>
+            <column name="related_topic" value="equations"/>
+            <column name="relation_strength" valueNumeric="0.7"/>
+        </insert>
+
+        <insert tableName="topic_graph">
+            <column name="topic" value="geometry_basics"/>
+            <column name="related_topic" value="areas"/>
+            <column name="relation_strength" valueNumeric="0.9"/>
+        </insert>
+        <insert tableName="topic_graph">
+            <column name="topic" value="geometry_basics"/>
+            <column name="related_topic" value="perimeter"/>
+            <column name="relation_strength" valueNumeric="0.85"/>
+        </insert>
+        <insert tableName="topic_graph">
+            <column name="topic" value="geometry_basics"/>
+            <column name="related_topic" value="angles"/>
+            <column name="relation_strength" valueNumeric="0.8"/>
+        </insert>
+
+        <insert tableName="topic_graph">
+            <column name="topic" value="areas"/>
+            <column name="related_topic" value="perimeter"/>
+            <column name="relation_strength" valueNumeric="0.75"/>
+        </insert>
+        <insert tableName="topic_graph">
+            <column name="topic" value="areas"/>
+            <column name="related_topic" value="geometry_basics"/>
+            <column name="relation_strength" valueNumeric="0.9"/>
+        </insert>
+
+    </changeSet>
+
+</databaseChangeLog>

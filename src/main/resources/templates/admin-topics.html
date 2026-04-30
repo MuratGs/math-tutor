@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <title>MathLearn — темы</title>
+  <link rel="stylesheet" href="/webjars/bootstrap/5.3.0/css/bootstrap.min.css">
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background-color: #f9fafc;
+      color: #1e293b;
+    }
+    .navbar {
+      background-color: white !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border-bottom: 1px solid #e9edf2;
+    }
+    .navbar-brand {
+      color: #0f172a !important;
+      font-weight: 600;
+    }
+    .btn-outline-light {
+      color: #475569;
+      border-color: #e2e8f0;
+      background: white;
+    }
+    .btn-outline-light:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
+    .card {
+      border: 1px solid #e9edf2;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      background: white;
+    }
+    .topic-item {
+      border: 1px solid #e9edf2;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fff;
+      text-decoration: none;
+      color: #0f172a;
+      display: block;
+    }
+    .topic-item:hover {
+      background: #f8fafc;
+    }
+    .topic-item.active {
+      border-color: #0d6efd;
+      background: #f3f7ff;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.92rem;
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar">
+  <div class="container">
+    <span class="navbar-brand">MathLearn</span>
+    <div>
+      <a href="/admin" class="btn btn-outline-light me-2">Админка</a>
+      <a href="/profile" class="btn btn-outline-light me-2">Профиль</a>
+      <a href="/learn" class="btn btn-outline-light me-2">Обучение</a>
+      <a href="/logout" class="btn btn-outline-light">Выйти</a>
+    </div>
+  </div>
+</nav>
+
+<main class="container mt-4">
+  <div class="mb-4">
+    <h2 class="fw-semibold" style="color: #0f172a;">Темы и граф знаний</h2>
+    <p class="text-secondary">Управление реестром тем и связями между ними</p>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-4">
+      <div class="card p-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0" style="font-weight: 500;">Реестр тем</h5>
+        </div>
+
+        <form method="get" action="/admin/topics" class="mb-3">
+          <label class="form-label text-secondary">Дисциплина</label>
+          <select name="discipline" class="form-select" onchange="this.form.submit()">
+            <option th:each="d : ${disciplines}" th:value="${d}" th:selected="${d == selectedDiscipline}" th:text="${d}"></option>
+          </select>
+        </form>
+
+        <div th:if="${topics == null || topics.empty}" class="text-secondary">Нет тем</div>
+
+        <div th:unless="${topics == null || topics.empty}" class="d-grid gap-2">
+          <a th:each="t : ${topics}"
+             th:href="@{/admin/topics(discipline=${selectedDiscipline}, topicKey=${t.topicKey})}"
+             th:class="${selectedTopicKey == t.topicKey} ? 'topic-item active' : 'topic-item'">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <div class="fw-semibold" th:text="${t.displayName != null ? t.displayName : t.topicKey}"></div>
+                <div class="text-secondary small mono" th:text="${t.topicKey}"></div>
+              </div>
+              <div class="text-end">
+                <span th:if="${t.active}" class="badge text-bg-success">активна</span>
+                <span th:unless="${t.active}" class="badge text-bg-secondary">выключена</span>
+                <span th:if="${t.stub}" class="badge text-bg-warning ms-1">заглушка</span>
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <div class="card p-4 mt-3">
+        <h5 class="mb-3" style="font-weight: 500;">Добавить / обновить тему</h5>
+        <form action="/admin/topics/topic/create" method="post" class="d-grid gap-2">
+          <div>
+            <label class="form-label text-secondary">Ключ темы (topicKey)</label>
+            <input type="text" class="form-control mono" name="topicKey" placeholder="например: fractions" required>
+          </div>
+          <div>
+            <label class="form-label text-secondary">Название (displayName)</label>
+            <input type="text" class="form-control" name="displayName" placeholder="например: Работа с дробями">
+          </div>
+          <div>
+            <label class="form-label text-secondary">Дисциплина (discipline)</label>
+            <input type="text" class="form-control mono" name="discipline" th:value="${selectedDiscipline}" placeholder="math" required>
+          </div>
+          <div class="d-flex gap-3">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="active" id="topicActive" checked>
+              <label class="form-check-label" for="topicActive">Активна</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="stub" id="topicStub">
+              <label class="form-check-label" for="topicStub">Заглушка</label>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card p-4">
+        <h5 class="mb-3" style="font-weight: 500;">Выбранная тема</h5>
+
+        <div th:if="${selectedTopicKey == null || selectedTopicKey.isEmpty()}" class="text-secondary">Выберите тему слева</div>
+
+        <div th:unless="${selectedTopicKey == null || selectedTopicKey.isEmpty()}">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="fw-semibold" th:text="${keyToDisplay[selectedTopicKey]}"></div>
+              <div class="text-secondary small mono" th:text="${selectedTopicKey}"></div>
+            </div>
+            <div class="d-flex gap-2">
+              <form action="/admin/topics/topic/toggle-active" method="post">
+                <input type="hidden" name="topicKey" th:value="${selectedTopicKey}">
+                <input type="hidden" name="discipline" th:value="${selectedDiscipline}">
+                <button type="submit" class="btn btn-outline-primary btn-sm">Переключить активность</button>
+              </form>
+              <form action="/admin/topics/topic/toggle-stub" method="post">
+                <input type="hidden" name="topicKey" th:value="${selectedTopicKey}">
+                <input type="hidden" name="discipline" th:value="${selectedDiscipline}">
+                <button type="submit" class="btn btn-outline-warning btn-sm">Переключить «заглушка»</button>
+              </form>
+              <form action="/admin/topics/topic/regenerate" method="post">
+                <input type="hidden" name="topicKey" th:value="${selectedTopicKey}">
+                <input type="hidden" name="discipline" th:value="${selectedDiscipline}">
+                <button type="submit" class="btn btn-primary btn-sm">Сгенерировать связи (AI)</button>
+              </form>
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <div class="row g-3">
+            <div class="col-md-7">
+              <h6 class="mb-2" style="font-weight: 500;">Связанные темы</h6>
+
+              <div th:if="${relations == null || relations.empty}" class="text-secondary">Связей пока нет</div>
+
+              <div th:unless="${relations == null || relations.empty}" class="table-responsive">
+                <table class="table align-middle">
+                  <thead>
+                  <tr>
+                    <th>Связанная тема</th>
+                    <th>Сила связи</th>
+                    <th></th>
+                  </tr>
+                  </thead>
+                  <tbody>
+                  <tr th:each="r : ${relations}">
+                    <td>
+                      <div th:text="${keyToDisplay[r.relatedTopic]}"></div>
+                      <div class="text-secondary small mono" th:text="${r.relatedTopic}"></div>
+                    </td>
+                    <td class="mono" th:text="${#numbers.formatDecimal(r.relationStrength, 1, 2)}"></td>
+                    <td class="text-end">
+                      <form action="/admin/topics/relation/delete" method="post" class="d-inline">
+                        <input type="hidden" name="id" th:value="${r.id}">
+                        <input type="hidden" name="discipline" th:value="${selectedDiscipline}">
+                        <input type="hidden" name="topicKey" th:value="${selectedTopicKey}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                      </form>
+                    </td>
+                  </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="col-md-5">
+              <h6 class="mb-2" style="font-weight: 500;">Добавить / обновить связь</h6>
+              <form action="/admin/topics/relation/upsert" method="post" class="d-grid gap-2">
+                <input type="hidden" name="topic" th:value="${selectedTopicKey}">
+                <input type="hidden" name="discipline" th:value="${selectedDiscipline}">
+
+                <div>
+                  <label class="form-label text-secondary">Связанная тема</label>
+                  <select class="form-select" name="relatedTopic" required>
+                    <option th:each="n : ${allNodes}" th:value="${n.topicKey}" th:text="${n.topicKey + ' — ' + (n.displayName != null ? n.displayName : n.topicKey)}"></option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="form-label text-secondary">Сила связи (0..1)</label>
+                  <input class="form-control mono" type="number" step="0.01" min="0" max="1" name="strength" value="0.7" required>
+                </div>
+
+                <button type="submit" class="btn btn-outline-primary">Сохранить связь</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

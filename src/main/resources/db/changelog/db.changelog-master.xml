@@ -11,5 +11,7 @@
     <include file="db/changelog/004-standard-tasks-and-reports.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/005-deactivate-invalid-standard-tasks.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/006-task-history-abandoned.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/007-topic-registry.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/008-topic-graph-defaults.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

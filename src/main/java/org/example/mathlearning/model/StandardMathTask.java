@@ -15,6 +15,9 @@ public class StandardMathTask {
     @Column(name = "topic", nullable = false, length = 64)
     private String topic;
 
+    @Column(name = "discipline", nullable = false, length = 64)
+    private String discipline = "Алгебра";
+
     @Column(name = "grade", nullable = false)
     private Integer grade;
 
@@ -80,6 +83,14 @@ public class StandardMathTask {
 
     public void setTopic(String topic) {
         this.topic = topic;
+    }
+
+    public String getDiscipline() {
+        return discipline;
+    }
+
+    public void setDiscipline(String discipline) {
+        this.discipline = discipline;
     }
 
     public Integer getGrade() {

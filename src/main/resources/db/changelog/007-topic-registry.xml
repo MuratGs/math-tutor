@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="007-1-add-discipline-to-standard-math-tasks" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="standard_math_tasks"/>
+                <not>
+                    <columnExists tableName="standard_math_tasks" columnName="discipline"/>
+                </not>
+            </and>
+        </preConditions>
+
+        <addColumn tableName="standard_math_tasks">
+            <column name="discipline" type="VARCHAR(64)" defaultValue="Алгебра">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+
+        <sql>
+            UPDATE standard_math_tasks
+            SET discipline = 'Прикладная математика'
+            WHERE topic IN ('speed_time_distance','word_problems','statistics');
+        </sql>
+
+        <sql>
+            UPDATE standard_math_tasks
+            SET discipline = 'Геометрия'
+            WHERE topic IN ('geometry_basics','areas','perimeter','angles','coordinate_plane');
+        </sql>
+    </changeSet>
+
+    <changeSet id="007-2-create-topic-registry" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="topic_registry"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="topic_registry">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="topic_key" type="VARCHAR(64)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="display_name" type="VARCHAR(128)"/>
+            <column name="discipline" type="VARCHAR(64)"/>
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_stub" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+
+        <createIndex tableName="topic_registry" indexName="idx_topic_registry_discipline">
+            <column name="discipline"/>
+        </createIndex>
+        <createIndex tableName="topic_registry" indexName="idx_topic_registry_active_stub">
+            <column name="is_active"/>
+            <column name="is_stub"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="007-3-create-topic-graph" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="topic_graph"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="topic_graph">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="topic" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="related_topic" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="relation_strength" type="FLOAT">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <addUniqueConstraint tableName="topic_graph" columnNames="topic, related_topic" constraintName="uq_topic_graph_edge"/>
+
+        <createIndex tableName="topic_graph" indexName="idx_topic_graph_topic">
+            <column name="topic"/>
+        </createIndex>
+
+        <createIndex tableName="topic_graph" indexName="idx_topic_graph_related_topic">
+            <column name="related_topic"/>
+        </createIndex>
+
+        <addForeignKeyConstraint
+                baseTableName="topic_graph"
+                baseColumnNames="topic"
+                referencedTableName="topic_registry"
+                referencedColumnNames="topic_key"
+                constraintName="fk_topic_graph_topic"/>
+
+        <addForeignKeyConstraint
+                baseTableName="topic_graph"
+                baseColumnNames="related_topic"
+                referencedTableName="topic_registry"
+                referencedColumnNames="topic_key"
+                constraintName="fk_topic_graph_related_topic"/>
+    </changeSet>
+
+    <changeSet id="007-4-seed-topic-registry" author="cascade" runInTransaction="true">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="topic_registry"/>
+                <sqlCheck expectedResult="0">SELECT COUNT(*) FROM topic_registry;</sqlCheck>
+            </and>
+        </preConditions>
+
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="fractions"/>
+            <column name="display_name" value="Дроби"/>
+            <column name="discipline" value="Алгебра"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="percent"/>
+            <column name="display_name" value="Проценты"/>
+            <column name="discipline" value="Алгебра"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="equations"/>
+            <column name="display_name" value="Уравнения"/>
+            <column name="discipline" value="Алгебра"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="ratios"/>
+            <column name="display_name" value="Пропорции"/>
+            <column name="discipline" value="Алгебра"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="integers"/>
+            <column name="display_name" value="Целые числа"/>
+            <column name="discipline" value="Алгебра"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="decimals"/>
+            <column name="display_name" value="Десятичные дроби"/>
+            <column name="discipline" value="Алгебра"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="expressions"/>
+            <column name="display_name" value="Выражения"/>
+            <column name="discipline" value="Алгебра"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="number_theory"/>
+            <column name="display_name" value="Теория чисел"/>
+            <column name="discipline" value="Алгебра"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="speed_time_distance"/>
+            <column name="display_name" value="Скорость, время, расстояние"/>
+            <column name="discipline" value="Прикладная математика"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="word_problems"/>
+            <column name="display_name" value="Текстовые задачи"/>
+            <column name="discipline" value="Прикладная математика"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="statistics"/>
+            <column name="display_name" value="Статистика"/>
+            <column name="discipline" value="Прикладная математика"/>
+            <column name="is_active" valueBoolean="true"/>
+            <column name="is_stub" valueBoolean="false"/>
+        </insert>
+
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="geometry_basics"/>
+            <column name="display_name" value="Основы геометрии"/>
+            <column name="discipline" value="Геометрия"/>
+            <column name="is_active" valueBoolean="false"/>
+            <column name="is_stub" valueBoolean="true"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="areas"/>
+            <column name="display_name" value="Площади фигур"/>
+            <column name="discipline" value="Геометрия"/>
+            <column name="is_active" valueBoolean="false"/>
+            <column name="is_stub" valueBoolean="true"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="perimeter"/>
+            <column name="display_name" value="Периметр"/>
+            <column name="discipline" value="Геометрия"/>
+            <column name="is_active" valueBoolean="false"/>
+            <column name="is_stub" valueBoolean="true"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="angles"/>
+            <column name="display_name" value="Углы"/>
+            <column name="discipline" value="Геометрия"/>
+            <column name="is_active" valueBoolean="false"/>
+            <column name="is_stub" valueBoolean="true"/>
+        </insert>
+        <insert tableName="topic_registry">
+            <column name="topic_key" value="coordinate_plane"/>
+            <column name="display_name" value="Координатная плоскость"/>
+            <column name="discipline" value="Геометрия"/>
+            <column name="is_active" valueBoolean="false"/>
+            <column name="is_stub" valueBoolean="true"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>

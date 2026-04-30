@@ -481,6 +481,8 @@ public class StandardTaskService {
                 return "Алгебра";
             case "geometry":
                 return "Геометрия";
+            case "expressions":
+                return "Выражения";
             case "fractions":
                 return "Работа с дробями";
             case "percent":

@@ -104,7 +104,7 @@ public class OllamaService {
     public String generateTask(String topic, int level, String sessionId, Long userId) {
         log.info("🤖 Генерация задачи для пользователя {}... Тема: {}, Уровень: {}", userId, topic, level);
 
-        String topicRu = topic.equals("algebra") ? "алгебре" : "геометрии";
+        String topicRu = StandardTaskService.getTopicDisplayName(topic);
 
         User user = null;
         if (userId != null) {
@@ -117,7 +117,7 @@ public class OllamaService {
         }
 
         String prompt = String.format(
-                "Ты - учитель математики в российской школе. Придумай математическую задачу по %s для %d класса.\n\n" +
+                "Ты - учитель математики в российской школе. Придумай математическую задачу по теме '%s' для %d класса.\n\n" +
                         "ТРЕБОВАНИЯ К ЗАДАЧЕ:\n" +
                         "1. Задача должна быть на русском языке\n" +
                         "2. Напиши ТОЛЬКО условие задачи, без решения и без ответа\n" +
@@ -499,6 +499,39 @@ public class OllamaService {
 
     public String askModel(String prompt) {
         return callOllama(prompt);
+    }
+
+    public String generateTopicRelations(String newTopicKey, String newTopicDisplayName, List<String> existingTopics) {
+        String topicsBlock = existingTopics == null || existingTopics.isEmpty()
+                ? ""
+                : String.join("\n", existingTopics);
+
+        String prompt = String.format(
+                "You are a math curriculum expert. A new topic '%s' (key: '%s') is being added to a math tutoring system.\n" +
+                        "Existing topics in the system:\n" +
+                        "%s\n\n" +
+                        "Determine which existing topics are related to '%s' and how strongly (0.0 to 1.0).\n" +
+                        "Return ONLY a JSON array, no explanation: [{\"related_topic\":\"topic_key\",\"strength\":0.85}, ...]\n" +
+                        "Only include topics with strength > 0.3. Maximum 6 relations.",
+                newTopicDisplayName, newTopicKey, topicsBlock, newTopicDisplayName
+        );
+
+        String response = callOllama(prompt);
+        return extractJsonArray(response);
+    }
+
+    private String extractJsonArray(String response) {
+        if (response == null) {
+            return null;
+        }
+        String r = response.trim();
+
+        int firstBracket = r.indexOf('[');
+        int lastBracket = r.lastIndexOf(']');
+        if (firstBracket >= 0 && lastBracket >= 0 && lastBracket > firstBracket) {
+            return r.substring(firstBracket, lastBracket + 1).trim();
+        }
+        return r;
     }
 
     private String callOllama(String prompt) {

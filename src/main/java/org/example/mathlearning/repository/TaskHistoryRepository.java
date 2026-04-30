@@ -79,6 +79,13 @@ public interface TaskHistoryRepository extends JpaRepository<TaskHistory, Long> 
         return findRecentForProfileByUserId(userId, PageRequest.of(0, limit));
     }
 
+    @Query("SELECT t FROM TaskHistory t WHERE t.user.id = :userId AND t.task.topic = :topic ORDER BY t.createdAt DESC")
+    List<TaskHistory> findRecentByUserIdAndTopic(@Param("userId") Long userId, @Param("topic") String topic, Pageable pageable);
+
+    default List<TaskHistory> findRecentByUserIdAndTopic(Long userId, String topic, int limit) {
+        return findRecentByUserIdAndTopic(userId, topic, PageRequest.of(0, limit));
+    }
+
     @Query("SELECT COUNT(t) FROM TaskHistory t WHERE t.user.id = :userId AND t.solved = true")
     int countSolvedByUserId(@Param("userId") Long userId);
 
@@ -105,6 +112,11 @@ public interface TaskHistoryRepository extends JpaRepository<TaskHistory, Long> 
     @Transactional
     @Query("UPDATE TaskHistory t SET t.abandoned = true WHERE t.user.id = :userId AND t.solved = false AND t.abandoned = false AND t.id <> :keepId")
     int abandonOtherInProgressTasks(@Param("userId") Long userId, @Param("keepId") Long keepId);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE TaskHistory t SET t.abandoned = true WHERE t.user.id = :userId AND t.solved = false AND t.abandoned = false")
+    int abandonAllInProgressTasks(@Param("userId") Long userId);
 
     @Modifying
     @Transactional
