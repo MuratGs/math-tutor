@@ -8,5 +8,8 @@
     <include file="db/changelog/001-baseline.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/002-normalize-taskhistory.xml" relativeToChangelogFile="false"/>
     <include file="db/changelog/003-add-admin-flag.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/004-standard-tasks-and-reports.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/005-deactivate-invalid-standard-tasks.xml" relativeToChangelogFile="false"/>
+    <include file="db/changelog/006-task-history-abandoned.xml" relativeToChangelogFile="false"/>
 
 </databaseChangeLog>

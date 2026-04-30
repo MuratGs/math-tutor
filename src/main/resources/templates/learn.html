@@ -181,9 +181,16 @@
             <div class="card p-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <span class="level-badge">
-                        Уровень <span th:text="${level}"></span>/5 • <span th:text="${topic == 'algebra' ? 'Алгебра' : 'Геометрия'}"></span>
+                        Уровень <span th:text="${level}"></span>/5 • <span th:text="${topicDisplay != null ? topicDisplay : (topic == 'algebra' ? 'Алгебра' : 'Геометрия')}"></span>
                     </span>
                     <span class="level-badge" th:if="${recommendedLevel}" th:text="'Рекомендуемый уровень ' + ${recommendedLevel} + '/5'"></span>
+                </div>
+
+                <div class="text-secondary small mb-2" th:if="${taskTopicDisplay != null}" th:text="'Тема: ' + ${taskTopicDisplay}"></div>
+
+                <div class="alert alert-info py-2" th:if="${taskHint != null}">
+                    <span class="fw-medium">Подсказка:</span>
+                    <span th:text="${taskHint}"></span>
                 </div>
 
                 <div class="progress mb-4">
@@ -203,7 +210,7 @@
 
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary" id="checkBtn">Проверить</button>
-                        <a href="/learn" class="btn btn-secondary" id="newTaskBtn">Новая задача</a>
+                        <a href="/learn?newTask=true" class="btn btn-secondary" id="newTaskBtn">Новая задача</a>
                     </div>
 
                     <div class="attempt-info text-center" th:if="${attempts != null && attempts > 0}">

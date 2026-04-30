@@ -34,6 +34,9 @@ public class TaskHistory {
     @Column(name = "solved_at")
     private LocalDateTime solvedAt;
 
+    @Column(name = "abandoned", nullable = false)
+    private Boolean abandoned = false;
+
     // Конструкторы
     public TaskHistory() {}
 
@@ -93,4 +96,12 @@ public class TaskHistory {
 
     public LocalDateTime getSolvedAt() { return solvedAt; }
     public void setSolvedAt(LocalDateTime solvedAt) { this.solvedAt = solvedAt; }
+
+    public Boolean getAbandoned() {
+        return abandoned;
+    }
+
+    public void setAbandoned(Boolean abandoned) {
+        this.abandoned = abandoned;
+    }
 }

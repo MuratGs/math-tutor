@@ -6,6 +6,7 @@ import org.example.mathlearning.repository.TaskHistoryRepository;
 import org.example.mathlearning.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 
 @Service
@@ -49,7 +50,21 @@ public class UserService {
     }
 
     public List<TaskHistory> getRecentTasks(Long userId, int limit) {
-        return taskHistoryRepository.findRecentByUserId(userId, limit);
+        ensureSingleInProgressTask(userId);
+        return taskHistoryRepository.findRecentForProfileByUserId(userId, limit);
+    }
+
+    @Transactional
+    protected void ensureSingleInProgressTask(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        taskHistoryRepository.findTopByUser_IdAndSolvedFalseAndAbandonedFalseOrderByCreatedAtDesc(userId)
+                .ifPresent(h -> {
+                    if (h.getId() != null) {
+                        taskHistoryRepository.abandonOtherInProgressTasks(userId, h.getId());
+                    }
+                });
     }
 
     public double getSuccessRate(Long userId) {

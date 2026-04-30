@@ -3,12 +3,17 @@ package org.example.mathlearning.controller;
 import jakarta.servlet.http.HttpSession;
 import org.example.mathlearning.model.TaskHistory;
 import org.example.mathlearning.model.User;
+import org.example.mathlearning.repository.TaskReportRepository;
 import org.example.mathlearning.repository.TaskHistoryRepository;
 import org.example.mathlearning.repository.UserRepository;
+import org.example.mathlearning.service.StandardTaskService;
+import org.example.mathlearning.service.TaskReportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -24,6 +29,15 @@ public class AdminController {
 
     @Autowired
     private TaskHistoryRepository taskHistoryRepository;
+
+    @Autowired
+    private TaskReportRepository taskReportRepository;
+
+    @Autowired
+    private TaskReportService taskReportService;
+
+    @Autowired
+    private StandardTaskService standardTaskService;
 
     @GetMapping("/admin")
     public String admin(HttpSession session, Model model) {
@@ -86,6 +100,9 @@ public class AdminController {
 
         List<TaskHistory> recentSolved = taskHistoryRepository.findRecentSolved(10);
 
+        model.addAttribute("taskReports", taskReportRepository.findTop50ByOrderByCreatedAtDesc());
+        model.addAttribute("newTaskReports", taskReportRepository.findTop50ByStatusOrderByCreatedAtDesc("NEW"));
+
         model.addAttribute("totalUsers", totalUsers);
         model.addAttribute("usersByLevel", usersByLevel);
         model.addAttribute("overallSuccessRate", overallSuccessRate);
@@ -95,5 +112,40 @@ public class AdminController {
         model.addAttribute("recentSolved", recentSolved);
 
         return "admin";
+    }
+
+    @PostMapping("/admin/task-report/resolve")
+    public String resolveTaskReport(@RequestParam("id") Long reportId,
+                                    @RequestParam(value = "adminNote", required = false) String adminNote,
+                                    HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            return "redirect:/login";
+        }
+
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null || !Boolean.TRUE.equals(user.getAdmin())) {
+            return "redirect:/profile";
+        }
+
+        taskReportService.resolveReport(reportId, adminNote);
+        return "redirect:/admin";
+    }
+
+    @PostMapping("/admin/standard-task/deactivate")
+    public String deactivateStandardTask(@RequestParam("id") Long standardTaskId,
+                                         HttpSession session) {
+        Long userId = (Long) session.getAttribute("userId");
+        if (userId == null) {
+            return "redirect:/login";
+        }
+
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null || !Boolean.TRUE.equals(user.getAdmin())) {
+            return "redirect:/profile";
+        }
+
+        standardTaskService.deactivateStandardTask(standardTaskId);
+        return "redirect:/admin";
     }
 }

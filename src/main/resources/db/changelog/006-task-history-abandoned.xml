@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="006-1-add-task-history-abandoned" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="task_history"/>
+                <not>
+                    <columnExists tableName="task_history" columnName="abandoned"/>
+                </not>
+            </and>
+        </preConditions>
+
+        <addColumn tableName="task_history">
+            <column name="abandoned" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="006-2-idx-task-history-user-solved-abandoned" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="task_history"/>
+                <columnExists tableName="task_history" columnName="user_id"/>
+                <columnExists tableName="task_history" columnName="solved"/>
+                <columnExists tableName="task_history" columnName="abandoned"/>
+                <not>
+                    <indexExists tableName="task_history" indexName="idx_task_history_user_solved_abandoned"/>
+                </not>
+            </and>
+        </preConditions>
+
+        <createIndex tableName="task_history" indexName="idx_task_history_user_solved_abandoned">
+            <column name="user_id"/>
+            <column name="solved"/>
+            <column name="abandoned"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

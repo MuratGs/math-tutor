@@ -190,13 +190,84 @@
             <tbody>
             <tr th:each="t : ${recentSolved}">
               <td th:text="${t.user.username}"></td>
-              <td th:text="${t.topic == 'algebra' ? 'Алгебра' : 'Геометрия'}"></td>
+              <td th:text="${T(org.example.mathlearning.service.StandardTaskService).getTopicDisplayName(t.topic)}"></td>
               <td th:text="${t.level}"></td>
               <td th:text="${t.attempts}"></td>
               <td>
                 <span th:text="${t.taskText.length() > 60 ? t.taskText.substring(0,60) + '…' : t.taskText}"></span>
               </td>
               <td class="text-secondary small" th:text="${#temporals.format(t.createdAt, 'dd MMM HH:mm')}"></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-4 mt-3">
+        <h5 class="mb-3" style="font-weight: 500;">Жалобы на задачи (NEW)</h5>
+
+        <div th:if="${newTaskReports == null || newTaskReports.empty}" class="text-secondary">Нет новых жалоб</div>
+
+        <div th:unless="${newTaskReports == null || newTaskReports.empty}" class="table-responsive">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>Пользователь</th>
+              <th>Тип</th>
+              <th>Текст</th>
+              <th>Задача</th>
+              <th>Дата</th>
+              <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${newTaskReports}">
+              <td th:text="${r.user.username}"></td>
+              <td th:text="${r.reportType}"></td>
+              <td th:text="${r.reportText.length() > 60 ? r.reportText.substring(0,60) + '…' : r.reportText}"></td>
+              <td th:text="${r.taskText.length() > 60 ? r.taskText.substring(0,60) + '…' : r.taskText}"></td>
+              <td class="text-secondary small" th:text="${#temporals.format(r.createdAt, 'dd MMM HH:mm')}"></td>
+              <td>
+                <form action="/admin/task-report/resolve" method="post" class="d-flex gap-2">
+                  <input type="hidden" name="id" th:value="${r.id}">
+                  <input type="text" class="form-control form-control-sm" name="adminNote" placeholder="Комментарий (опц.)">
+                  <button type="submit" class="btn btn-sm btn-primary">Закрыть</button>
+                </form>
+
+                <form th:if="${r.standardTask != null}" action="/admin/standard-task/deactivate" method="post" class="mt-2">
+                  <input type="hidden" name="id" th:value="${r.standardTask.id}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Отключить задачу</button>
+                </form>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-4 mt-3">
+        <h5 class="mb-3" style="font-weight: 500;">Последние жалобы</h5>
+
+        <div th:if="${taskReports == null || taskReports.empty}" class="text-secondary">Нет данных</div>
+
+        <div th:unless="${taskReports == null || taskReports.empty}" class="table-responsive">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>Статус</th>
+              <th>Пользователь</th>
+              <th>Тип</th>
+              <th>Задача</th>
+              <th>Дата</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${taskReports}">
+              <td th:text="${r.status}"></td>
+              <td th:text="${r.user.username}"></td>
+              <td th:text="${r.reportType}"></td>
+              <td th:text="${r.taskText.length() > 60 ? r.taskText.substring(0,60) + '…' : r.taskText}"></td>
+              <td class="text-secondary small" th:text="${#temporals.format(r.createdAt, 'dd MMM HH:mm')}"></td>
             </tr>
             </tbody>
           </table>

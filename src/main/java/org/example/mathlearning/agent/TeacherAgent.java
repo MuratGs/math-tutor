@@ -99,7 +99,17 @@ public class TeacherAgent extends Agent {
 
     private void handleCheck(String task, String answer, ACLMessage reply) {
         String result = ollamaService.checkAnswer(task, answer);
-        boolean isCorrect = result.contains("✅");
+        boolean isCorrect = false;
+        if (result != null) {
+            String r = result.trim();
+            if (!r.isEmpty()) {
+                String firstLine = r.split("\\R", 2)[0].trim();
+                isCorrect = firstLine.startsWith("✅") || firstLine.contains("✅");
+                if (firstLine.contains("❌")) {
+                    isCorrect = false;
+                }
+            }
+        }
 
         // Сохраняем результат в буфер
         recentResults.offer(isCorrect);

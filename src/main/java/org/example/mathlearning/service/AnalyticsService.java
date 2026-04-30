@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 @Service
 public class AnalyticsService {
@@ -85,6 +86,36 @@ public class AnalyticsService {
      * Определить слабые темы пользователя
      */
     public String identifyWeakTopics(Long userId) {
+        Map<String, Map<String, Object>> topicsPerf = getTopicsPerformance(userId);
+        if (topicsPerf != null && !topicsPerf.isEmpty()) {
+            String worstTopic = null;
+            double worstRate = 2.0;
+
+            for (Map.Entry<String, Map<String, Object>> e : topicsPerf.entrySet()) {
+                Map<String, Object> v = e.getValue();
+                Object totalObj = v.get("total");
+                Object correctObj = v.get("correct");
+                if (!(totalObj instanceof Number) || !(correctObj instanceof Number)) {
+                    continue;
+                }
+                long total = ((Number) totalObj).longValue();
+                long correct = ((Number) correctObj).longValue();
+                if (total < 5) {
+                    continue;
+                }
+
+                double rate = total == 0 ? 1.0 : (double) correct / (double) total;
+                if (rate < worstRate) {
+                    worstRate = rate;
+                    worstTopic = e.getKey();
+                }
+            }
+
+            if (worstTopic != null && worstRate < 0.5) {
+                return worstTopic;
+            }
+        }
+
         List<TaskHistory> tasks = taskHistoryRepository.findByUser_Id(userId);
 
         int algebraCorrect = 0;
@@ -112,5 +143,43 @@ public class AnalyticsService {
         }
 
         return "balanced";
+    }
+
+    /**
+     * Успеваемость по темам: topic -> { total, correct, successRate }
+     */
+    public Map<String, Map<String, Object>> getTopicsPerformance(Long userId) {
+        Map<String, Map<String, Object>> stats = new LinkedHashMap<>();
+
+        if (userId == null) {
+            return stats;
+        }
+
+        List<Object[]> rows = taskHistoryRepository.getTopicStatsByUserId(userId);
+        if (rows == null) {
+            return stats;
+        }
+
+        for (Object[] row : rows) {
+            if (row == null || row.length < 3) {
+                continue;
+            }
+
+            String topic = row[0] != null ? row[0].toString() : null;
+            if (topic == null || topic.trim().isEmpty()) {
+                continue;
+            }
+
+            long total = row[1] instanceof Number ? ((Number) row[1]).longValue() : 0L;
+            long correct = row[2] instanceof Number ? ((Number) row[2]).longValue() : 0L;
+
+            Map<String, Object> topicData = new HashMap<>();
+            topicData.put("total", total);
+            topicData.put("correct", correct);
+            topicData.put("successRate", total == 0 ? 0.0 : (double) correct * 100.0 / (double) total);
+            stats.put(topic, topicData);
+        }
+
+        return stats;
     }
 }

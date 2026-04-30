@@ -123,6 +123,7 @@ public class AuthController {
         model.addAttribute("analytics", analyticsService.getLevelStatistics(userId));
         model.addAttribute("weakTopic", analyticsService.identifyWeakTopics(userId));
         model.addAttribute("recommendedLevel", analyticsService.recommendNextLevel(userId));
+        model.addAttribute("topicsPerformance", analyticsService.getTopicsPerformance(userId));
 
         return "profile";
     }

@@ -202,6 +202,11 @@
           <div th:text="${task}"></div>
         </div>
 
+        <div class="task-preview mb-4" th:if="${taskHint != null}">
+          <div class="text-secondary small mb-2">Подсказка</div>
+          <div th:text="${taskHint}"></div>
+        </div>
+
         <div class="task-preview mb-4" th:if="${answer != null}">
           <div class="text-secondary small mb-2">Ваш ответ</div>
           <div th:text="${answer}"></div>
@@ -225,8 +230,31 @@
           <div th:text="${disputeResult}"></div>
         </div>
 
+        <div th:if="${reportSuccess != null}" class="alert alert-success mb-4" th:text="${reportSuccess}"></div>
+
+        <div class="task-preview mb-4">
+          <div class="text-secondary small mb-2">Сообщить о проблеме в задаче</div>
+          <form action="/task/report" method="post">
+            <input type="hidden" name="standardTaskId" th:value="${standardTaskId}">
+            <div class="mb-2">
+              <select class="form-select" name="reportType" required>
+                <option value="">Выберите тип проблемы…</option>
+                <option value="STATEMENT_ERROR">Ошибка в условии</option>
+                <option value="NOT_ENOUGH_DATA">Недостаточно данных</option>
+                <option value="AMBIGUOUS">Неоднозначная формулировка</option>
+                <option value="ANSWER_WRONG">Некорректный ответ/проверка</option>
+                <option value="OTHER">Другое</option>
+              </select>
+            </div>
+            <div class="mb-2">
+              <textarea class="form-control" name="reportText" rows="3" placeholder="Опишите, что именно не так" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-secondary">Отправить</button>
+          </form>
+        </div>
+
         <div th:if="${isCorrect}" class="d-grid gap-2">
-          <a href="/learn" class="btn btn-primary task-nav">Следующая задача</a>
+          <a href="/learn?newTask=true" class="btn btn-primary task-nav">Следующая задача</a>
         </div>
 
         <div th:if="${!isCorrect and attemptsLeft != null}" class="d-grid gap-2">
@@ -236,7 +264,7 @@
         </div>
 
         <div th:if="${!isCorrect and newTask != null}" class="d-grid gap-2">
-          <a href="/learn" class="btn btn-primary task-nav">Новая задача</a>
+          <a href="/learn?newTask=true" class="btn btn-primary task-nav">Новая задача</a>
         </div>
 
         <div class="text-center mt-4">

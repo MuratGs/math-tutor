@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="005-1-deactivate-invalid-standard-math-tasks" author="cascade" runInTransaction="true">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="standard_math_tasks"/>
+        </preConditions>
+
+        <sql dbms="postgresql">
+            UPDATE standard_math_tasks
+            SET is_active = false
+            WHERE is_active = true
+              AND statement ~ E'[0-9]+\\\\s*/\\\\s*([^0-9]|$)';
+        </sql>
+
+        <sql dbms="h2">
+            UPDATE standard_math_tasks
+            SET is_active = false
+            WHERE is_active = true
+              AND REGEXP_LIKE(statement, '[0-9]+\\s*/\\s*([^0-9]|$)');
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

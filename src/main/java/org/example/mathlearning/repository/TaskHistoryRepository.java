@@ -72,6 +72,13 @@ public interface TaskHistoryRepository extends JpaRepository<TaskHistory, Long> 
         return findRecentByUserId(userId, PageRequest.of(0, limit));
     }
 
+    @Query("SELECT t FROM TaskHistory t WHERE t.user.id = :userId AND (t.solved = true OR (t.solved = false AND t.abandoned = false)) ORDER BY t.createdAt DESC")
+    List<TaskHistory> findRecentForProfileByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    default List<TaskHistory> findRecentForProfileByUserId(Long userId, int limit) {
+        return findRecentForProfileByUserId(userId, PageRequest.of(0, limit));
+    }
+
     @Query("SELECT COUNT(t) FROM TaskHistory t WHERE t.user.id = :userId AND t.solved = true")
     int countSolvedByUserId(@Param("userId") Long userId);
 
@@ -82,11 +89,22 @@ public interface TaskHistoryRepository extends JpaRepository<TaskHistory, Long> 
             "FROM TaskHistory t WHERE t.user.id = :userId GROUP BY t.task.level ORDER BY t.task.level")
     List<Object[]> getLevelStatsByUserId(@Param("userId") Long userId);
 
+    @Query("SELECT t.task.topic, COUNT(t), SUM(CASE WHEN t.solved THEN 1 ELSE 0 END) " +
+            "FROM TaskHistory t WHERE t.user.id = :userId AND t.task.topic IS NOT NULL GROUP BY t.task.topic ORDER BY t.task.topic")
+    List<Object[]> getTopicStatsByUserId(@Param("userId") Long userId);
+
     @Query("SELECT AVG(t.attempts) FROM TaskHistory t WHERE t.user.id = :userId AND t.solved = true")
     Double getAverageAttemptsByUserId(@Param("userId") Long userId);
 
     @Query("SELECT t FROM TaskHistory t WHERE t.user.id = :userId AND t.solved = false ORDER BY t.createdAt DESC")
     List<TaskHistory> findUnsolvedByUserId(@Param("userId") Long userId);
+
+    Optional<TaskHistory> findTopByUser_IdAndSolvedFalseAndAbandonedFalseOrderByCreatedAtDesc(Long userId);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE TaskHistory t SET t.abandoned = true WHERE t.user.id = :userId AND t.solved = false AND t.abandoned = false AND t.id <> :keepId")
+    int abandonOtherInProgressTasks(@Param("userId") Long userId, @Param("keepId") Long keepId);
 
     @Modifying
     @Transactional

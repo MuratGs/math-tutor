@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="004-1-create-standard-math-tasks" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="standard_math_tasks"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="standard_math_tasks">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="topic" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="grade" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="difficulty" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="statement" type="VARCHAR(2000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="correct_answer" type="VARCHAR(255)"/>
+            <column name="hint" type="VARCHAR(1000)"/>
+            <column name="is_manual" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_ai_generated" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+        </createTable>
+
+        <createIndex tableName="standard_math_tasks" indexName="idx_standard_math_tasks_topic">
+            <column name="topic"/>
+        </createIndex>
+        <createIndex tableName="standard_math_tasks" indexName="idx_standard_math_tasks_grade_difficulty">
+            <column name="grade"/>
+            <column name="difficulty"/>
+        </createIndex>
+        <createIndex tableName="standard_math_tasks" indexName="idx_standard_math_tasks_active">
+            <column name="is_active"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="004-2-create-task-reports" author="cascade">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <tableExists tableName="task_reports"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="task_reports">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="user_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="standard_task_id" type="BIGINT"/>
+            <column name="task_text" type="VARCHAR(2000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="user_answer" type="VARCHAR(1000)"/>
+            <column name="is_correct" type="BOOLEAN"/>
+            <column name="report_type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="report_text" type="VARCHAR(2000)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="status" type="VARCHAR(16)" defaultValue="NEW">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP"/>
+            <column name="resolved_at" type="TIMESTAMP"/>
+            <column name="admin_note" type="VARCHAR(1000)"/>
+        </createTable>
+
+        <addForeignKeyConstraint
+                baseTableName="task_reports"
+                baseColumnNames="user_id"
+                referencedTableName="users"
+                referencedColumnNames="id"
+                constraintName="fk_task_reports_user"/>
+
+        <addForeignKeyConstraint
+                baseTableName="task_reports"
+                baseColumnNames="standard_task_id"
+                referencedTableName="standard_math_tasks"
+                referencedColumnNames="id"
+                constraintName="fk_task_reports_standard_task"/>
+
+        <createIndex tableName="task_reports" indexName="idx_task_reports_user_id">
+            <column name="user_id"/>
+        </createIndex>
+        <createIndex tableName="task_reports" indexName="idx_task_reports_created_at">
+            <column name="created_at"/>
+        </createIndex>
+        <createIndex tableName="task_reports" indexName="idx_task_reports_status">
+            <column name="status"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="004-3-seed-standard-math-tasks" author="cascade" runInTransaction="true">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <tableExists tableName="standard_math_tasks"/>
+                <sqlCheck expectedResult="0">
+                    SELECT COUNT(*) FROM standard_math_tasks;
+                </sqlCheck>
+            </and>
+        </preConditions>
+
+        <insert tableName="standard_math_tasks">
+            <column name="topic" value="fractions"/>
+            <column name="grade" valueNumeric="6"/>
+            <column name="difficulty" valueNumeric="2"/>
+            <column name="statement" value="Вычисли: 3/4 + 1/8."/>
+            <column name="correct_answer" value="7/8"/>
+            <column name="hint" value="Приведи дроби к общему знаменателю."/>
+            <column name="is_manual" valueBoolean="true"/>
+            <column name="is_ai_generated" valueBoolean="false"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <insert tableName="standard_math_tasks">
+            <column name="topic" value="fractions"/>
+            <column name="grade" valueNumeric="6"/>
+            <column name="difficulty" valueNumeric="3"/>
+            <column name="statement" value="Вычисли: 5/6 − 1/4."/>
+            <column name="correct_answer" value="7/12"/>
+            <column name="hint" value="Найди НОК(6,4) и приведи к общему знаменателю."/>
+            <column name="is_manual" valueBoolean="true"/>
+            <column name="is_ai_generated" valueBoolean="false"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <insert tableName="standard_math_tasks">
+            <column name="topic" value="percent"/>
+            <column name="grade" valueNumeric="6"/>
+            <column name="difficulty" valueNumeric="2"/>
+            <column name="statement" value="Найди 15% от 200."/>
+            <column name="correct_answer" value="30"/>
+            <column name="hint" value="15% = 0,15. Умножь 200 на 0,15."/>
+            <column name="is_manual" valueBoolean="true"/>
+            <column name="is_ai_generated" valueBoolean="false"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <insert tableName="standard_math_tasks">
+            <column name="topic" value="percent"/>
+            <column name="grade" valueNumeric="7"/>
+            <column name="difficulty" valueNumeric="3"/>
+            <column name="statement" value="Цена товара увеличилась на 20% и стала 600 рублей. Какова была цена до увеличения?"/>
+            <column name="correct_answer" value="500"/>
+            <column name="hint" value="600 = 120% от исходной цены."/>
+            <column name="is_manual" valueBoolean="true"/>
+            <column name="is_ai_generated" valueBoolean="false"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <insert tableName="standard_math_tasks">
+            <column name="topic" value="equations"/>
+            <column name="grade" valueNumeric="6"/>
+            <column name="difficulty" valueNumeric="2"/>
+            <column name="statement" value="Реши уравнение: x + 7 = 19."/>
+            <column name="correct_answer" value="12"/>
+            <column name="hint" value="Перенеси 7 в правую часть со знаком минус."/>
+            <column name="is_manual" valueBoolean="true"/>
+            <column name="is_ai_generated" valueBoolean="false"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <insert tableName="standard_math_tasks">
+            <column name="topic" value="equations"/>
+            <column name="grade" valueNumeric="7"/>
+            <column name="difficulty" valueNumeric="3"/>
+            <column name="statement" value="Реши уравнение: 3x − 5 = 16."/>
+            <column name="correct_answer" value="7"/>
+            <column name="hint" value="Сначала прибавь 5 к обеим частям, затем раздели на 3."/>
+            <column name="is_manual" valueBoolean="true"/>
+            <column name="is_ai_generated" valueBoolean="false"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <insert tableName="standard_math_tasks">
+            <column name="topic" value="areas"/>
+            <column name="grade" valueNumeric="6"/>
+            <column name="difficulty" valueNumeric="2"/>
+            <column name="statement" value="Найди площадь прямоугольника со сторонами 8 см и 5 см."/>
+            <column name="correct_answer" value="40"/>
+            <column name="hint" value="Площадь прямоугольника равна произведению его сторон."/>
+            <column name="is_manual" valueBoolean="true"/>
+            <column name="is_ai_generated" valueBoolean="false"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <insert tableName="standard_math_tasks">
+            <column name="topic" value="areas"/>
+            <column name="grade" valueNumeric="7"/>
+            <column name="difficulty" valueNumeric="3"/>
+            <column name="statement" value="Найди площадь треугольника с основанием 12 см и высотой 7 см."/>
+            <column name="correct_answer" value="42"/>
+            <column name="hint" value="S = (a·h)/2."/>
+            <column name="is_manual" valueBoolean="true"/>
+            <column name="is_ai_generated" valueBoolean="false"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <insert tableName="standard_math_tasks">
+            <column name="topic" value="speed_time_distance"/>
+            <column name="grade" valueNumeric="6"/>
+            <column name="difficulty" valueNumeric="3"/>
+            <column name="statement" value="Пешеход шёл со скоростью 4 км/ч в течение 3 часов. Какое расстояние он прошёл?"/>
+            <column name="correct_answer" value="12"/>
+            <column name="hint" value="S = v·t."/>
+            <column name="is_manual" valueBoolean="true"/>
+            <column name="is_ai_generated" valueBoolean="false"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+        <insert tableName="standard_math_tasks">
+            <column name="topic" value="speed_time_distance"/>
+            <column name="grade" valueNumeric="7"/>
+            <column name="difficulty" valueNumeric="4"/>
+            <column name="statement" value="Автомобиль проехал 150 км за 2,5 часа. Найди среднюю скорость автомобиля."/>
+            <column name="correct_answer" value="60"/>
+            <column name="hint" value="v = S / t."/>
+            <column name="is_manual" valueBoolean="true"/>
+            <column name="is_ai_generated" valueBoolean="false"/>
+            <column name="is_active" valueBoolean="true"/>
+        </insert>
+
+    </changeSet>
+
+</databaseChangeLog>

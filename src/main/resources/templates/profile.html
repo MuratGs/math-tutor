@@ -287,6 +287,37 @@
         </table>
       </div>
 
+      <div class="card p-4 mt-3">
+        <h5 class="mb-3" style="font-weight: 500;">Успеваемость по темам</h5>
+
+        <div th:if="${topicsPerformance == null || topicsPerformance.empty}" class="text-secondary text-center py-4">
+          Пока недостаточно данных по темам
+        </div>
+
+        <div th:unless="${topicsPerformance == null || topicsPerformance.empty}" class="table-responsive">
+          <table class="table">
+            <thead>
+            <tr>
+              <th>Тема</th>
+              <th>Всего</th>
+              <th>Правильно</th>
+              <th>Успешность</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="entry : ${topicsPerformance}">
+              <td>
+                <span th:text="${T(org.example.mathlearning.service.StandardTaskService).getTopicDisplayName(entry.key)}"></span>
+              </td>
+              <td th:text="${entry.value.total}"></td>
+              <td th:text="${entry.value.correct}"></td>
+              <td th:text="${#numbers.formatDecimal(entry.value.successRate, 1, 1)} + '%'"></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Последние задачи -->
       <div class="card p-4 mt-3">
         <h5 class="mb-3" style="font-weight: 500;">Последние задачи</h5>
@@ -311,7 +342,9 @@
                 <span th:text="${task.taskText.length() > 30 ? task.taskText.substring(0,30) + '…' : task.taskText}"></span>
                 <span class="badge bg-secondary ms-1" th:text="${task.level}"></span>
               </td>
-              <td th:text="${task.topic == 'algebra' ? 'Алгебра' : 'Геометрия'}"></td>
+              <td>
+                <span th:text="${T(org.example.mathlearning.service.StandardTaskService).getTopicDisplayName(task.topic)}"></span>
+              </td>
               <td>
                 <span th:if="${task.solved}" class="badge-success">Решено</span>
                 <span th:unless="${task.solved}" class="badge-warning">В процессе</span>

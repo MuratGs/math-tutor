@@ -49,6 +49,57 @@ public class OllamaService {
         return generateTask(topic, level, sessionId, null);
     }
 
+    public String generateNewStandardTask(String topic, int grade, int difficulty) {
+        String topicRu;
+        switch (topic) {
+            case "fractions":
+                topicRu = "дробям";
+                break;
+            case "percent":
+                topicRu = "процентам";
+                break;
+            case "equations":
+                topicRu = "уравнениям";
+                break;
+            case "areas":
+                topicRu = "площадям";
+                break;
+            case "speed_time_distance":
+                topicRu = "задачам на скорость, время и расстояние";
+                break;
+            default:
+                topicRu = topic;
+        }
+
+        String prompt = String.format(
+                "Ты - учитель математики. Сгенерируй ОДНУ задачу по теме, корректную и однозначную.\n\n" +
+                        "Тема: %s\n" +
+                        "Класс: %d\n" +
+                        "Сложность: %d из 5\n\n" +
+                        "ТРЕБОВАНИЯ:\n" +
+                        "1. Напиши ТОЛЬКО условие задачи, без решения и без ответа.\n" +
+                        "2. Задача должна быть на русском языке.\n" +
+                        "3. Если используешь дроби, каждая дробь должна быть полностью записана как a/b (с числителем и знаменателем).\n" +
+                        "4. Не оставляй незавершённых дробей вида '7/'.\n\n" +
+                        "5. Не используй смешанные дроби вида '1 1/2' — используй неправильную дробь (например 3/2).\n\n" +
+                        "6. Условие должно быть однозначным: все числа/единицы/данные должны быть указаны, один чёткий вопрос.\n\n" +
+                        "Напиши только условие:",
+                topicRu, grade, difficulty
+        );
+
+        try {
+            String task = callOllama(prompt);
+            task = cleanTask(task);
+            if (task == null || task.trim().isEmpty()) {
+                return null;
+            }
+            return task;
+        } catch (Exception e) {
+            log.error("❌ Ошибка генерации новой стандартной задачи: {}", e.getMessage());
+            return null;
+        }
+    }
+
     @Transactional
     public String generateTask(String topic, int level, String sessionId, Long userId) {
         log.info("🤖 Генерация задачи для пользователя {}... Тема: {}, Уровень: {}", userId, topic, level);
@@ -114,6 +165,10 @@ public class OllamaService {
                         ? new TaskHistory(sessionId, user, mathTask)
                         : new TaskHistory(sessionId, mathTask);
                 taskHistoryRepository.save(history);
+
+                if (user != null && history.getId() != null) {
+                    taskHistoryRepository.abandonOtherInProgressTasks(user.getId(), history.getId());
+                }
                 return task;
             }
         } catch (Exception e) {
@@ -135,6 +190,10 @@ public class OllamaService {
                     ? new TaskHistory(sessionId, user, fallbackMathTask)
                     : new TaskHistory(sessionId, fallbackMathTask);
             taskHistoryRepository.save(history);
+
+            if (user != null && history.getId() != null) {
+                taskHistoryRepository.abandonOtherInProgressTasks(user.getId(), history.getId());
+            }
             return fallbackTask;
         }
 
@@ -145,7 +204,65 @@ public class OllamaService {
                 ? new TaskHistory(sessionId, user, fallbackMathTask)
                 : new TaskHistory(sessionId, fallbackMathTask);
         taskHistoryRepository.save(history);
+
+        if (user != null && history.getId() != null) {
+            taskHistoryRepository.abandonOtherInProgressTasks(user.getId(), history.getId());
+        }
         return fallbackTask;
+    }
+
+    public String generateSimilarStandardTask(String topic, int grade, int difficulty, String baseStatement) {
+        String topicRu;
+        switch (topic) {
+            case "fractions":
+                topicRu = "дробям";
+                break;
+            case "percent":
+                topicRu = "процентам";
+                break;
+            case "equations":
+                topicRu = "уравнениям";
+                break;
+            case "areas":
+                topicRu = "площадям";
+                break;
+            case "speed_time_distance":
+                topicRu = "задачам на скорость, время и расстояние";
+                break;
+            default:
+                topicRu = topic;
+        }
+
+        String prompt = String.format(
+                "Ты - учитель математики. Сгенерируй ПОДОБНУЮ задачу, максимально близкую по типу, теме и уровню сложности. " +
+                        "НО числа должны быть другими (и можно чуть изменить формулировку).\n\n" +
+                        "Тема: %s\n" +
+                        "Класс: %d\n" +
+                        "Сложность: %d из 5\n\n" +
+                        "Исходная задача: %s\n\n" +
+                        "ТРЕБОВАНИЯ:\n" +
+                        "1. Напиши ТОЛЬКО условие задачи, без решения и без ответа.\n" +
+                        "2. Задача должна быть на русском языке.\n" +
+                        "3. Сохрани тот же тип навыка (тот же формат), но измени числа.\n" +
+                        "4. Условие должно быть корректным и однозначным.\n\n" +
+                        "5. Если используешь дроби — не оставляй незавершённых дробей вида '7/'.\n" +
+                        "6. Не используй смешанные дроби вида '1 1/2' — используй неправильную дробь (например 3/2).\n\n" +
+                        "7. Условие должно быть однозначным: все числа/единицы/данные должны быть указаны, один чёткий вопрос.\n\n" +
+                        "Напиши только условие:",
+                topicRu, grade, difficulty, baseStatement
+        );
+
+        try {
+            String task = callOllama(prompt);
+            task = cleanTask(task);
+            if (task == null || task.trim().isEmpty()) {
+                return null;
+            }
+            return task;
+        } catch (Exception e) {
+            log.error("❌ Ошибка генерации похожей задачи: {}", e.getMessage());
+            return null;
+        }
     }
 
     // ==================== ПРОВЕРКА ОТВЕТОВ ====================
@@ -166,6 +283,10 @@ public class OllamaService {
                 "Ты - учитель математики. Проверь ответ ученика.\n\n" +
                         "Задача: %s\n" +
                         "Ответ ученика: %s\n\n" +
+                        "ФОРМАТ ОТВЕТА (ОБЯЗАТЕЛЬНО):\n" +
+                        "1) Первая строка должна НАЧИНАТЬСЯ строго с ✅ или ❌ (без текста до эмодзи).\n" +
+                        "2) Вторая строка должна быть строго в формате: ОТВЕТ=... (без лишнего текста).\n" +
+                        "   Примеры: ОТВЕТ=12  или  ОТВЕТ=3;8\n\n" +
                         "ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА СРАВНЕНИЯ ОТВЕТА (НЕ НАРУШАЙ):\n" +
                         "1. Никогда не считай ответ неверным только из-за формата записи (пробелы, запятые, слова, единицы измерения).\n" +
                         "2. Десятичные дроби: запятая и точка эквивалентны (12,4 = 12.4).\n" +
@@ -174,11 +295,10 @@ public class OllamaService {
                         "4. Если порядок значений не указан явно, принимай любой порядок (например 3,8 = 8,3).\n\n" +
                         "ИНСТРУКЦИЯ ПО ПРОВЕРКЕ:\n" +
                         "1. Сначала РЕШИ ЭТУ ЗАДАЧУ САМОСТОЯТЕЛЬНО. Выполни все вычисления шаг за шагом.\n" +
-                        "2. Запиши свой вычисленный ответ.\n" +
-                        "3. Сравни свой ответ с ответом ученика.\n" +
-                        "4. Если ответ правильный - напиши только: ✅ Правильно! Молодец!\n" +
-                        "5. Если ответ неправильный - напиши только: ❌ Неправильно. Правильный ответ: [число или числа]\n\n" +
-                        "ВАЖНО: Ты обязан выполнить вычисления самостоятельно, а не просто оценивать ответ ученика.\n\n" +
+                        "2. Запиши свой вычисленный ответ в строке ОТВЕТ=...\n" +
+                        "3. Сравни с ответом ученика.\n" +
+                        "4. Если ответ правильный - первая строка ✅. Если неправильный - первая строка ❌.\n" +
+                        "5. С третьей строки (необязательно) можешь дать короткое объяснение.\n\n" +
                         "Твой ответ:",
                 task, answer
         );
@@ -187,14 +307,23 @@ public class OllamaService {
             String response = callOllama(prompt);
             log.info("📦 Ответ от Ollama: {}", response);
 
-            if (response.contains("✅")) {
-                extractAndCacheCorrectAnswer(task, answer);
-                return response;
-            } else if (response.contains("❌")) {
+            Boolean verdict = parseCheckVerdict(response);
+            if (verdict != null) {
                 String correctAnswer = extractCorrectAnswer(response);
                 if (correctAnswer != null) {
                     answerCache.put(task, correctAnswer);
                 }
+
+                if (Boolean.TRUE.equals(verdict)) {
+                    if (correctAnswer != null) {
+                        boolean ok = compareAnswers(answer, correctAnswer);
+                        if (!ok) {
+                            return "❌ Неправильно. Правильный ответ: " + correctAnswer;
+                        }
+                    }
+                    return response;
+                }
+
                 return response;
             }
         } catch (Exception e) {
@@ -202,6 +331,46 @@ public class OllamaService {
         }
 
         return localCheck(task, answer);
+    }
+
+    private Boolean parseCheckVerdict(String response) {
+        if (response == null) {
+            return null;
+        }
+        String r = response.trim();
+        if (r.isEmpty()) {
+            return null;
+        }
+
+        String firstLine = r.split("\\R", 2)[0].trim();
+        if (firstLine.contains("✅")) {
+            return true;
+        }
+        if (firstLine.contains("❌")) {
+            return false;
+        }
+
+        int ok = r.indexOf("✅");
+        int bad = r.indexOf("❌");
+        if (ok >= 0 && bad >= 0) {
+            return ok < bad;
+        }
+        if (ok >= 0) {
+            return true;
+        }
+        if (bad >= 0) {
+            return false;
+        }
+
+        String firstLineLower = firstLine.toLowerCase(Locale.ROOT);
+        if (firstLineLower.startsWith("правильно") || firstLineLower.startsWith("верно")) {
+            return true;
+        }
+
+        if (firstLineLower.startsWith("неправильно") || firstLineLower.startsWith("неверно")) {
+            return false;
+        }
+        return null;
     }
 
     public String disputeAnswer(String task, String answer) {
@@ -350,16 +519,30 @@ public class OllamaService {
     }
 
     private String extractCorrectAnswer(String response) {
+        if (response == null) {
+            return null;
+        }
+
+        String[] lines = response.split("\\R");
+        for (String line : lines) {
+            if (line == null) {
+                continue;
+            }
+            String t = line.trim();
+            if (t.toUpperCase(Locale.ROOT).startsWith("ОТВЕТ=")) {
+                String v = t.substring("ОТВЕТ=".length()).trim();
+                if (!v.isEmpty()) {
+                    return v;
+                }
+            }
+        }
+
         Pattern pattern = Pattern.compile("\\d+(?:[\\.,]\\d+)?");
         Matcher matcher = pattern.matcher(response);
         if (matcher.find()) {
             return matcher.group().replace(',', '.');
         }
         return null;
-    }
-
-    private void extractAndCacheCorrectAnswer(String task, String answer) {
-        answerCache.put(task, answer.trim());
     }
 
     private boolean compareAnswers(String userAnswer, String correctAnswer) {
@@ -511,16 +694,27 @@ public class OllamaService {
     }
 
     private String cleanTask(String task) {
-        return task.replace("Задача:", "")
+        if (task == null) {
+            return "";
+        }
+
+        String t = task;
+        t = t.replace("Задача:", "")
                 .replace("задача:", "")
                 .replace("Ответ:", "")
                 .replace("ответ:", "")
                 .replace("Решение:", "")
-                .replace("решение:", "")
-                .replaceAll("\\d+\\.\\s*", "")
-                .replaceAll("\\n", " ")
+                .replace("решение:", "");
+
+        // Убираем нумерацию только в начале строк (например: "1. ..."),
+        // чтобы не ломать дроби вида "3/4." (раньше удалялось "4." и получалось "3/")
+        t = t.replaceAll("(?m)^\\s*\\d+\\.\\s*", "");
+
+        t = t.replaceAll("\\n", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
+
+        return t;
     }
 
     public int getSolvedTasksCountByLevel(String sessionId, int level) {
