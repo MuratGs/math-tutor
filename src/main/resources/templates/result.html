@@ -219,6 +219,13 @@
           <span th:text="${result}"></span>
         </div>
 
+        <div th:if="${topicSwitched}" style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:16px;margin:16px 0;">
+          <strong>Смена темы!</strong>
+          Переходим на связанную тему:
+          <strong th:text="${switchedToTopic}"></strong>.
+          После неё вернёмся к основной.
+        </div>
+
         <div th:if="${!isCorrect}" class="d-grid gap-2 mb-4">
           <form action="/dispute" method="post" id="disputeForm">
             <button type="submit" class="btn btn-secondary" id="disputeBtn">Оспорить проверку</button>
@@ -264,7 +271,7 @@
         </div>
 
         <div th:if="${!isCorrect and newTask != null}" class="d-grid gap-2">
-          <a href="/learn?newTask=true" class="btn btn-primary task-nav">Новая задача</a>
+          <a th:href="${topicSwitched} ? @{/learn} : @{/learn(newTask=true)}" class="btn btn-primary task-nav">Новая задача</a>
         </div>
 
         <div class="text-center mt-4">

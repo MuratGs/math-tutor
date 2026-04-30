@@ -197,6 +197,11 @@ public class MathController {
 
         if ("EXPLORING_RELATED".equals(topicState)) {
             ensureExploringTopicSelected(session);
+            String exploringTopic = (String) session.getAttribute("exploringTopic");
+            if (exploringTopic != null && !exploringTopic.isBlank()) {
+                topic = exploringTopic;
+                session.setAttribute("lastTopicGroup", topic);
+            }
         }
 
         if (topic == null || topic.trim().isEmpty()) {
@@ -220,13 +225,14 @@ public class MathController {
         String currentTaskTopic = (String) session.getAttribute("currentTaskTopic");
         String currentTaskHint = (String) session.getAttribute("currentTaskHint");
         String lastTask = (String) session.getAttribute("lastTask");
+        boolean requestNewTask = Boolean.TRUE.equals(newTask);
 
         Boolean skipResumeInProgress = (Boolean) session.getAttribute("skipResumeInProgress");
         if (Boolean.TRUE.equals(skipResumeInProgress)) {
             session.removeAttribute("skipResumeInProgress");
         }
 
-        if (!Boolean.TRUE.equals(skipResumeInProgress) && (currentTask == null || currentTask.trim().isEmpty())) {
+        if (!requestNewTask && !Boolean.TRUE.equals(skipResumeInProgress) && (currentTask == null || currentTask.trim().isEmpty())) {
             Optional<TaskHistory> inProgress = taskHistoryRepository.findTopByUser_IdAndSolvedFalseAndAbandonedFalseOrderByCreatedAtDesc(userId);
             if (inProgress.isPresent() && inProgress.get().getTask() != null) {
                 String taskText = inProgress.get().getTaskText();
@@ -330,8 +336,6 @@ public class MathController {
             session.removeAttribute("retrySimilarGrade");
             session.removeAttribute("retrySimilarDifficulty");
 
-            advanceExploringProgress(session);
-
             model.addAttribute("task", generated.trim());
             model.addAttribute("topic", topic);
             model.addAttribute("topicDisplay", StandardTaskService.getTopicDisplayName(topic));
@@ -344,7 +348,6 @@ public class MathController {
             return "learn";
         }
 
-        boolean requestNewTask = Boolean.TRUE.equals(newTask);
         if (!requestNewTask && currentTask != null && !currentTask.isEmpty() && currentTopicGroup != null && currentTopicGroup.equals(topic)) {
             log.info("Используем существующую задачу для повторной попытки");
             model.addAttribute("task", currentTask);
@@ -432,17 +435,23 @@ public class MathController {
             // Явный запрос "Новая задача" должен генерировать новую задачу через Ollama как раньше,
             // а не выбирать следующую из готовой стандартной базы.
             if (overrideStandardTaskId == null && Boolean.TRUE.equals(newTask)) {
-                String avoidTopic = (String) session.getAttribute("currentTaskTopic");
-                if (avoidTopic == null || avoidTopic.trim().isEmpty()) {
-                    avoidTopic = (String) session.getAttribute("lastTaskTopic");
+                String specificTopic = requestedTopicForTask;
+                String stateForNewTask = (String) session.getAttribute("topicState");
+                if (!"EXPLORING_RELATED".equals(stateForNewTask)) {
+                    specificTopic = (String) session.getAttribute("currentTaskTopic");
+                    if (specificTopic == null || specificTopic.isBlank()) {
+                        specificTopic = (String) session.getAttribute("selectedTopic");
+                    }
+                    if (specificTopic == null || specificTopic.isBlank()) {
+                        specificTopic = requestedTopicForTask;
+                    }
                 }
-                if ((avoidTopic == null || avoidTopic.trim().isEmpty()) && lastTask != null && !lastTask.trim().isEmpty()) {
-                    avoidTopic = inferTopicForSimilar(lastTask, null, topic);
-                }
-                if (avoidTopic != null && ("algebra".equalsIgnoreCase(avoidTopic) || "geometry".equalsIgnoreCase(avoidTopic))) {
-                    avoidTopic = null;
-                }
-                String standardTopic = standardTaskService.chooseStandardTopicForUser(userId, requestedTopicForTask, avoidTopic);
+
+                String standardTopic = (specificTopic != null && !specificTopic.isBlank()
+                        && !"algebra".equalsIgnoreCase(specificTopic)
+                        && !"geometry".equalsIgnoreCase(specificTopic))
+                        ? specificTopic
+                        : standardTaskService.chooseStandardTopicForUser(userId, requestedTopicForTask);
                 Integer grade = inferGradeFromLevel(user.getCurrentLevel());
                 Integer difficulty = user.getCurrentLevel() != null ? user.getCurrentLevel() : 1;
 
@@ -454,38 +463,54 @@ public class MathController {
                     try {
                         candidate = ollamaService.generateNewStandardTask(candidateTopic, grade, difficulty);
                     } catch (Exception ex) {
-                        log.warn("Не удалось сгенерировать новую задачу (newTask): {}", ex.getMessage());
+                        log.warn("Не удалось сгенерировать новую задачу (newTask): topic={} grade={} difficulty={} attempt={}/{}",
+                                candidateTopic, grade, difficulty, i + 1, maxAttempts, ex);
                     }
 
                     if (candidate == null) {
+                        log.warn("⚠️ newTask: Ollama вернула null/невалидную задачу: topic={} grade={} difficulty={} attempt={}/{}",
+                                candidateTopic, grade, difficulty, i + 1, maxAttempts);
                         continue;
                     }
                     candidate = candidate.trim();
                     if (candidate.isEmpty()) {
+                        log.warn("⚠️ newTask: отклонена пустая задача: topic={} grade={} difficulty={} attempt={}/{}",
+                                candidateTopic, grade, difficulty, i + 1, maxAttempts);
                         continue;
                     }
                     if (currentTask != null && areTasksEquivalent(candidate, currentTask)) {
+                        log.warn("⚠️ newTask: отклонён дубль текущей задачи: topic={} attempt={} task='{}'",
+                                candidateTopic, i + 1, normalizeTaskForDedup(candidate));
                         continue;
                     }
                     if (lastTask != null && areTasksEquivalent(candidate, lastTask)) {
+                        log.warn("⚠️ newTask: отклонён дубль последней задачи: topic={} attempt={} task='{}'",
+                                candidateTopic, i + 1, normalizeTaskForDedup(candidate));
                         continue;
                     }
                     if (taskHistoryRepository.existsBySessionIdAndTask_TaskText(sessionId, candidate)) {
+                        log.warn("⚠️ newTask: отклонён дубль в текущей сессии: topic={} attempt={} task='{}'",
+                                candidateTopic, i + 1, normalizeTaskForDedup(candidate));
                         continue;
                     }
                     if (taskHistoryRepository.isTaskSolvedByUser(userId, candidate)) {
+                        log.warn("⚠️ newTask: отклонена уже решённая пользователем задача: userId={} topic={} attempt={} task='{}'",
+                                userId, candidateTopic, i + 1, normalizeTaskForDedup(candidate));
                         continue;
                     }
 
                     var stored = standardTaskService.storeAiGeneratedStandardTask(candidateTopic, grade, difficulty, candidate);
                     if (stored != null && stored.getId() != null) {
                         overrideStandardTaskId = stored.getId();
+                    } else {
+                        log.warn("⚠️ newTask: задача не сохранилась в standard tasks: topic={} grade={} difficulty={} attempt={} task='{}'",
+                                candidateTopic, grade, difficulty, i + 1, normalizeTaskForDedup(candidate));
                     }
                 }
 
                 if (overrideStandardTaskId == null) {
-                    model.addAttribute("error", "Не удалось сгенерировать новую задачу. Проверь, что Ollama запущена, и попробуй ещё раз.");
-                    return "error";
+                    log.warn("⚠️ newTask: после {} попыток не удалось создать AI-задачу, продолжаю обычную выдачу: topic={} standardTopic={} grade={} difficulty={}",
+                            maxAttempts, requestedTopicForTask, standardTopic, grade, difficulty);
                 }
             }
 
@@ -515,12 +540,15 @@ public class MathController {
                 model.addAttribute("recommendedLevel", recommendedLevel);
                 model.addAttribute("attempts", 0);
 
-                advanceExploringProgress(session);
-
                 return "learn";
             }
 
-            String fallbackTopic = standardTaskService.chooseStandardTopicForUser(userId, requestedTopicForTask, null);
+            String fallbackTopic = requestedTopicForTask;
+            if (fallbackTopic == null || fallbackTopic.isBlank()
+                    || "algebra".equalsIgnoreCase(fallbackTopic)
+                    || "geometry".equalsIgnoreCase(fallbackTopic)) {
+                fallbackTopic = standardTaskService.chooseStandardTopicForUser(userId, requestedTopicForTask, null);
+            }
             if (fallbackTopic == null || fallbackTopic.trim().isEmpty()) {
                 fallbackTopic = requestedTopicForTask;
             }
@@ -546,8 +574,6 @@ public class MathController {
             model.addAttribute("level", user.getCurrentLevel());
             model.addAttribute("recommendedLevel", recommendedLevel);
             model.addAttribute("attempts", 0);
-
-            advanceExploringProgress(session);
 
             return "learn";
 
@@ -615,10 +641,42 @@ public class MathController {
         if (isCorrect) {
             ollamaService.markTaskAsSolved(sessionId, task, userId);
 
-            correctInRow++;
-            wrongInRow = 0;
-            session.setAttribute("correctInRow", correctInRow);
-            session.setAttribute("wrongInRow", wrongInRow);
+            String topicState = (String) session.getAttribute("topicState");
+            if (topicState == null || topicState.isBlank()) {
+                topicState = "MAIN_TOPIC";
+            }
+
+            boolean wasExploring = "EXPLORING_RELATED".equals(topicState);
+            String solvedTopic = (String) session.getAttribute("currentTaskTopic");
+            if (wasExploring) {
+                wrongInRow = 0;
+                correctInRow = 0;
+                session.setAttribute("wrongInRow", 0);
+                session.setAttribute("correctInRow", 0);
+
+                String mainTopic = (String) session.getAttribute("mainTopic");
+                session.setAttribute("topicState", "MAIN_TOPIC");
+                session.setAttribute("exploringTopic", null);
+                session.setAttribute("relatedTopicsQueue", new ArrayList<String>());
+                session.setAttribute("tasksOnRelatedTopic", 0);
+                if (mainTopic != null && !mainTopic.isBlank()) {
+                    session.setAttribute("lastTopicGroup", mainTopic);
+                    session.setAttribute("selectedTopic", mainTopic);
+                }
+
+                result += " Отлично! Возвращаемся к основной теме: " + StandardTaskService.getTopicDisplayName(mainTopic);
+            } else {
+                correctInRow++;
+                wrongInRow = 0;
+                session.setAttribute("correctInRow", correctInRow);
+                session.setAttribute("wrongInRow", wrongInRow);
+                if (solvedTopic != null && !solvedTopic.isBlank()
+                        && !"algebra".equalsIgnoreCase(solvedTopic)
+                        && !"geometry".equalsIgnoreCase(solvedTopic)) {
+                    session.setAttribute("selectedTopic", solvedTopic);
+                    session.setAttribute("lastTopicGroup", solvedTopic);
+                }
+            }
 
             session.removeAttribute("currentTask");
             session.removeAttribute("attempts");
@@ -629,16 +687,18 @@ public class MathController {
             session.removeAttribute("currentTaskDifficulty");
             session.removeAttribute("currentTaskHint");
 
-            if (correctInRow >= 3 && user.getCurrentLevel() < 5) {
-                int newLevel = user.getCurrentLevel() + 1;
-                userService.updateUserLevel(userId, newLevel);
-                user = userRepository.findById(userId).orElse(user);
-                session.setAttribute("userLevel", newLevel);
-                result += " 🎉 УРОВЕНЬ ПОВЫШЕН ДО " + newLevel + "! Поздравляю!";
-                session.setAttribute("correctInRow", 0);
-            } else {
-                int needed = 3 - correctInRow;
-                result += " Осталось " + needed + " правильных ответов подряд до следующего уровня.";
+            if (!wasExploring) {
+                if (correctInRow >= 3 && user.getCurrentLevel() < 5) {
+                    int newLevel = user.getCurrentLevel() + 1;
+                    userService.updateUserLevel(userId, newLevel);
+                    user = userRepository.findById(userId).orElse(user);
+                    session.setAttribute("userLevel", newLevel);
+                    result += " 🎉 УРОВЕНЬ ПОВЫШЕН ДО " + newLevel + "! Поздравляю!";
+                    session.setAttribute("correctInRow", 0);
+                } else {
+                    int needed = 3 - correctInRow;
+                    result += " Осталось " + needed + " правильных ответов подряд до следующего уровня.";
+                }
             }
 
             model.addAttribute("result", result);
@@ -668,141 +728,134 @@ public class MathController {
                 user = userRepository.findById(userId).orElse(user);
                 session.setAttribute("userLevel", newLevel);
                 result += " ⚠️ УРОВЕНЬ ПОНИЖЕН ДО " + newLevel + " для повторения материала.";
-                session.setAttribute("wrongInRow", 0);
             }
 
-            if (attempts >= 3) {
-                boolean switchedToRelated = false;
+            if (wrongInRow >= 3) {
+                session.setAttribute("wrongInRow", 0);
+
+                String currentTopicForGraph = (String) session.getAttribute("currentTaskTopic");
                 String topicState = (String) session.getAttribute("topicState");
-                if (topicState == null || topicState.trim().isEmpty()) {
+                if (topicState == null || topicState.isBlank()) {
                     topicState = "MAIN_TOPIC";
                 }
 
-                if (!"EXPLORING_RELATED".equals(topicState)) {
-                    String baseTopic = (String) session.getAttribute("currentTaskTopic");
-                    if (baseTopic == null || baseTopic.trim().isEmpty()) {
-                        baseTopic = (String) session.getAttribute("lastTaskTopic");
-                    }
-
-                    if (baseTopic != null && !baseTopic.trim().isEmpty()) {
-                        List<String> related = topicGraphService.getRelatedTopics(baseTopic);
-                        if (related == null) {
-                            related = Collections.emptyList();
-                        }
-
-                        if (related.isEmpty()) {
-                            Optional<TopicNode> baseNodeOpt = topicNodeRepository.findByTopicKey(baseTopic);
-                            if (baseNodeOpt.isPresent()) {
-                                String d = baseNodeOpt.get().getDiscipline();
-                                if (d != null && !d.trim().isEmpty()) {
-                                    List<TopicNode> nodes = topicNodeRepository.findByDisciplineAndStubFalseAndActiveTrueOrderByDisplayNameAsc(d);
-                                    ArrayList<String> fallback = new ArrayList<>();
-                                    if (nodes != null) {
-                                        for (TopicNode x : nodes) {
-                                            if (x == null || x.getTopicKey() == null) {
-                                                continue;
-                                            }
-                                            String k = x.getTopicKey().trim();
-                                            if (k.isEmpty()) {
-                                                continue;
-                                            }
-                                            if (k.equalsIgnoreCase(baseTopic)) {
-                                                continue;
-                                            }
-                                            fallback.add(k);
-                                        }
-                                    }
-                                    related = fallback;
-                                }
-                            }
-                        }
-
-                        if (!related.isEmpty()) {
-                            session.setAttribute("topicState", "EXPLORING_RELATED");
-                            session.setAttribute("mainTopic", baseTopic);
-                            session.setAttribute("relatedTopicsQueue", new ArrayList<String>(related));
-                            session.setAttribute("exploringTopic", related.get(0));
+                if (currentTopicForGraph != null && !currentTopicForGraph.isBlank()) {
+                    if ("EXPLORING_RELATED".equals(topicState)) {
+                        ArrayList<String> queue = getRelatedTopicsQueue(session);
+                        if (!queue.isEmpty()) {
+                            String nextRelated = queue.remove(0);
+                            session.setAttribute("relatedTopicsQueue", new ArrayList<String>(queue));
+                            session.setAttribute("exploringTopic", nextRelated);
                             session.setAttribute("tasksOnRelatedTopic", 0);
-                            session.setAttribute("topicSwitchMessage", "Не получилось решить за 3 попытки — давай разберём смежную тему, чтобы закрыть пробел.");
+                            clearCurrentTask(session);
                             taskHistoryRepository.abandonAllInProgressTasks(userId);
                             session.setAttribute("skipResumeInProgress", true);
-                            session.removeAttribute("nextStandardTaskId");
+                            String switchMsg = "Ты часто ошибаешься. Переходим на следующую связанную тему: " +
+                                    StandardTaskService.getTopicDisplayName(nextRelated);
+                            return buildSwitchResult(model, switchMsg, task, answer, user, session, true,
+                                    StandardTaskService.getTopicDisplayName(nextRelated));
+                        } else {
+                            String mainTopic = (String) session.getAttribute("mainTopic");
+                            session.setAttribute("topicState", "MAIN_TOPIC");
+                            session.setAttribute("exploringTopic", null);
+                            session.setAttribute("relatedTopicsQueue", new ArrayList<String>());
+                            session.setAttribute("tasksOnRelatedTopic", 0);
+                            if (mainTopic != null && !mainTopic.isBlank()) {
+                                session.setAttribute("lastTopicGroup", mainTopic);
+                            }
+                            clearCurrentTask(session);
+                            taskHistoryRepository.abandonAllInProgressTasks(userId);
+                            session.setAttribute("skipResumeInProgress", true);
+                            String switchMsg = "Связанные темы закончились. Возвращаемся к основной теме: " +
+                                    StandardTaskService.getTopicDisplayName(mainTopic);
+                            return buildSwitchResult(model, switchMsg, task, answer, user, session, false, null);
+                        }
+                    } else {
+                        List<String> related = topicGraphService.getRelatedTopics(currentTopicForGraph);
+                        if (related != null && !related.isEmpty()) {
+                            session.setAttribute("topicState", "EXPLORING_RELATED");
+                            session.setAttribute("mainTopic", currentTopicForGraph);
+                            session.setAttribute("exploringTopic", related.get(0));
+                            ArrayList<String> queue = related.size() > 1
+                                    ? new ArrayList<String>(related.subList(1, related.size()))
+                                    : new ArrayList<String>();
+                            session.setAttribute("relatedTopicsQueue", queue);
+                            session.setAttribute("tasksOnRelatedTopic", 0);
+                            clearCurrentTask(session);
+                            taskHistoryRepository.abandonAllInProgressTasks(userId);
+                            session.setAttribute("skipResumeInProgress", true);
+                            String switchMsg = "Ты часто ошибаешься. Переходим на связанную тему: " +
+                                    StandardTaskService.getTopicDisplayName(related.get(0));
+                            return buildSwitchResult(model, switchMsg, task, answer, user, session, true,
+                                    StandardTaskService.getTopicDisplayName(related.get(0)));
+                        }
+                    }
+                }
+            }
+
+            if (attempts >= 3) {
+                result = "❌ К сожалению, ты не справился с задачей после 3 попыток. " +
+                        "Попробуй решить другую задачу того же уровня.";
+
+                Long standardTaskId = (Long) session.getAttribute("currentStandardTaskId");
+                String baseTopic = (String) session.getAttribute("currentTaskTopic");
+                String baseTopicGroup = (String) session.getAttribute("currentTopicGroup");
+                Integer baseGrade = (Integer) session.getAttribute("currentTaskGrade");
+                Integer baseDifficulty = (Integer) session.getAttribute("currentTaskDifficulty");
+
+                String topicForSimilar = inferTopicForSimilar(task, baseTopic, baseTopicGroup);
+                Integer gradeForSimilar = baseGrade != null ? baseGrade : inferGradeFromLevel(user.getCurrentLevel());
+                Integer difficultyForSimilar = baseDifficulty != null ? baseDifficulty : (user.getCurrentLevel() != null ? user.getCurrentLevel() : 1);
+
+                session.setAttribute("forceSimilarGeneration", true);
+                session.setAttribute("forceSimilarBaseStatement", task);
+                session.setAttribute("forceSimilarTopic", topicForSimilar);
+                session.setAttribute("forceSimilarGrade", gradeForSimilar);
+                session.setAttribute("forceSimilarDifficulty", difficultyForSimilar);
+
+                if (topicForSimilar != null && gradeForSimilar != null && difficultyForSimilar != null) {
+                    int maxAttempts = 6;
+                    for (int i = 0; i < maxAttempts; i++) {
+                        Set<String> usedInSession = loadSessionTaskFingerprints(sessionId);
+                        String candidate = null;
+                        try {
+                            if (i < 4) {
+                                candidate = ollamaService.generateSimilarStandardTask(topicForSimilar, gradeForSimilar, difficultyForSimilar, task);
+                            } else {
+                                candidate = ollamaService.generateNewStandardTask(topicForSimilar, gradeForSimilar, difficultyForSimilar);
+                            }
+                        } catch (Exception ex) {
+                            log.warn("Не удалось сгенерировать задачу после 3 попыток: {}", ex.getMessage());
+                        }
+
+                        if (candidate == null) {
+                            continue;
+                        }
+                        candidate = candidate.trim();
+                        if (candidate.isEmpty()) {
+                            continue;
+                        }
+
+                        if (areTasksEquivalent(candidate, task)) {
+                            continue;
+                        }
+                        if (usedInSession.contains(normalizeTaskForDedup(candidate))) {
+                            continue;
+                        }
+                        if (taskHistoryRepository.isTaskSolvedByUser(userId, candidate)) {
+                            continue;
+                        }
+
+                        var stored = standardTaskService.storeAiGeneratedStandardTask(topicForSimilar, gradeForSimilar, difficultyForSimilar, candidate);
+                        if (stored != null && stored.getId() != null) {
+                            session.setAttribute("nextStandardTaskId", stored.getId());
                             session.removeAttribute("forceSimilarGeneration");
                             session.removeAttribute("forceSimilarBaseStatement");
                             session.removeAttribute("forceSimilarTopic");
                             session.removeAttribute("forceSimilarGrade");
                             session.removeAttribute("forceSimilarDifficulty");
-                            switchedToRelated = true;
-                        }
-                    }
-                }
-
-                if (switchedToRelated) {
-                    result = "❌ К сожалению, ты не справился с задачей после 3 попыток. Переключаемся на смежную тему.";
-                } else {
-                    result = "❌ К сожалению, ты не справился с задачей после 3 попыток. " +
-                            "Попробуй решить другую задачу того же уровня.";
-
-                    Long standardTaskId = (Long) session.getAttribute("currentStandardTaskId");
-                    String baseTopic = (String) session.getAttribute("currentTaskTopic");
-                    String baseTopicGroup = (String) session.getAttribute("currentTopicGroup");
-                    Integer baseGrade = (Integer) session.getAttribute("currentTaskGrade");
-                    Integer baseDifficulty = (Integer) session.getAttribute("currentTaskDifficulty");
-
-                    String topicForSimilar = inferTopicForSimilar(task, baseTopic, baseTopicGroup);
-                    Integer gradeForSimilar = baseGrade != null ? baseGrade : inferGradeFromLevel(user.getCurrentLevel());
-                    Integer difficultyForSimilar = baseDifficulty != null ? baseDifficulty : (user.getCurrentLevel() != null ? user.getCurrentLevel() : 1);
-
-                    session.setAttribute("forceSimilarGeneration", true);
-                    session.setAttribute("forceSimilarBaseStatement", task);
-                    session.setAttribute("forceSimilarTopic", topicForSimilar);
-                    session.setAttribute("forceSimilarGrade", gradeForSimilar);
-                    session.setAttribute("forceSimilarDifficulty", difficultyForSimilar);
-
-                    if (topicForSimilar != null && gradeForSimilar != null && difficultyForSimilar != null) {
-                        int maxAttempts = 6;
-                        for (int i = 0; i < maxAttempts; i++) {
-                            Set<String> usedInSession = loadSessionTaskFingerprints(sessionId);
-                            String candidate = null;
-                            try {
-                                if (i < 4) {
-                                    candidate = ollamaService.generateSimilarStandardTask(topicForSimilar, gradeForSimilar, difficultyForSimilar, task);
-                                } else {
-                                    candidate = ollamaService.generateNewStandardTask(topicForSimilar, gradeForSimilar, difficultyForSimilar);
-                                }
-                            } catch (Exception ex) {
-                                log.warn("Не удалось сгенерировать задачу после 3 попыток: {}", ex.getMessage());
-                            }
-
-                            if (candidate == null) {
-                                continue;
-                            }
-                            candidate = candidate.trim();
-                            if (candidate.isEmpty()) {
-                                continue;
-                            }
-
-                            if (areTasksEquivalent(candidate, task)) {
-                                continue;
-                            }
-                            if (usedInSession.contains(normalizeTaskForDedup(candidate))) {
-                                continue;
-                            }
-                            if (taskHistoryRepository.isTaskSolvedByUser(userId, candidate)) {
-                                continue;
-                            }
-
-                            var stored = standardTaskService.storeAiGeneratedStandardTask(topicForSimilar, gradeForSimilar, difficultyForSimilar, candidate);
-                            if (stored != null && stored.getId() != null) {
-                                session.setAttribute("nextStandardTaskId", stored.getId());
-                                session.removeAttribute("forceSimilarGeneration");
-                                session.removeAttribute("forceSimilarBaseStatement");
-                                session.removeAttribute("forceSimilarTopic");
-                                session.removeAttribute("forceSimilarGrade");
-                                session.removeAttribute("forceSimilarDifficulty");
-                                log.info("🤖 Сгенерирована похожая задача и добавлена в стандартную базу: id={}", stored.getId());
-                                break;
-                            }
+                            log.info("🤖 Сгенерирована похожая задача и добавлена в стандартную базу: id={}", stored.getId());
+                            break;
                         }
                     }
                 }
@@ -860,37 +913,6 @@ public class MathController {
 
                 session.setAttribute("lastAttemptsLeft", 3 - attempts);
                 session.removeAttribute("lastNewTask");
-            }
-        }
-
-        String topicState = (String) session.getAttribute("topicState");
-        if (topicState == null || topicState.trim().isEmpty()) {
-            topicState = "MAIN_TOPIC";
-            session.setAttribute("topicState", "MAIN_TOPIC");
-        }
-
-        if ("MAIN_TOPIC".equals(topicState)) {
-            String currentTopicInSession = (String) session.getAttribute("lastTaskTopic");
-            if (currentTopicInSession == null || currentTopicInSession.trim().isEmpty()) {
-                currentTopicInSession = (String) session.getAttribute("currentTaskTopic");
-            }
-            if (currentTopicInSession == null || currentTopicInSession.trim().isEmpty()) {
-                currentTopicInSession = (String) session.getAttribute("selectedTopic");
-            }
-
-            if (currentTopicInSession != null && !currentTopicInSession.trim().isEmpty()) {
-                boolean shouldSwitch = topicGraphService.shouldSwitchToRelatedTopics(userId, currentTopicInSession);
-                if (shouldSwitch) {
-                    List<String> related = topicGraphService.getRelatedTopics(currentTopicInSession);
-                    if (related != null && !related.isEmpty()) {
-                        session.setAttribute("topicState", "EXPLORING_RELATED");
-                        session.setAttribute("mainTopic", currentTopicInSession);
-                        session.setAttribute("relatedTopicsQueue", new ArrayList<String>(related));
-                        session.setAttribute("exploringTopic", null);
-                        session.setAttribute("tasksOnRelatedTopic", 0);
-                        session.setAttribute("topicSwitchMessage", "Ты плохо решаешь эту тему. Давай попробуем связанные темы чтобы восполнить пробел.");
-                    }
-                }
             }
         }
 
@@ -1222,9 +1244,52 @@ public class MathController {
         session.removeAttribute("currentTaskDifficulty");
         session.removeAttribute("currentTaskHint");
         session.removeAttribute("lastTopicGroup");
+        session.removeAttribute("topicState");
+        session.removeAttribute("mainTopic");
+        session.removeAttribute("relatedTopicsQueue");
+        session.removeAttribute("exploringTopic");
+        session.removeAttribute("tasksOnRelatedTopic");
+        session.removeAttribute("selectedTopic");
 
         log.info("Прогресс сброшен для пользователя: {}", userId);
         return "redirect:/profile";
+    }
+
+    private void clearCurrentTask(HttpSession session) {
+        session.removeAttribute("currentTask");
+        session.removeAttribute("attempts");
+        session.removeAttribute("currentTopicGroup");
+        session.removeAttribute("currentStandardTaskId");
+        session.removeAttribute("currentTaskTopic");
+        session.removeAttribute("currentTaskGrade");
+        session.removeAttribute("currentTaskDifficulty");
+        session.removeAttribute("currentTaskHint");
+    }
+
+    private String buildSwitchResult(Model model,
+                                     String result,
+                                     String task,
+                                     String answer,
+                                     User user,
+                                     HttpSession session,
+                                     boolean topicSwitched,
+                                     String switchedToTopic) {
+        model.addAttribute("result", result);
+        model.addAttribute("task", task);
+        model.addAttribute("answer", answer);
+        model.addAttribute("level", user.getCurrentLevel());
+        model.addAttribute("isCorrect", false);
+        model.addAttribute("newTask", true);
+        model.addAttribute("topicSwitched", topicSwitched);
+        model.addAttribute("switchedToTopic", switchedToTopic);
+        model.addAttribute("taskHint", session.getAttribute("lastTaskHint"));
+        model.addAttribute("standardTaskId", session.getAttribute("lastStandardTaskId"));
+        model.addAttribute("taskTopic", session.getAttribute("lastTaskTopic"));
+        model.addAttribute("taskTopicDisplay", StandardTaskService.getTopicDisplayName((String) session.getAttribute("lastTaskTopic")));
+
+        session.setAttribute("lastNewTask", true);
+        session.removeAttribute("lastAttemptsLeft");
+        return "result";
     }
 
     // Статистика в JSON

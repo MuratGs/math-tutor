@@ -3,16 +3,19 @@ package org.example.mathlearning.service;
 import org.example.mathlearning.model.MathTask;
 import org.example.mathlearning.model.StandardMathTask;
 import org.example.mathlearning.model.TaskHistory;
+import org.example.mathlearning.model.TopicNode;
 import org.example.mathlearning.model.User;
 import org.example.mathlearning.repository.MathTaskRepository;
 import org.example.mathlearning.repository.StandardMathTaskRepository;
 import org.example.mathlearning.repository.TaskHistoryRepository;
+import org.example.mathlearning.repository.TopicNodeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class StandardTaskService {
@@ -27,6 +30,9 @@ public class StandardTaskService {
 
     @Autowired
     private TaskHistoryRepository taskHistoryRepository;
+
+    @Autowired
+    private TopicNodeRepository topicNodeRepository;
 
     @Autowired
     private OllamaService ollamaService;
@@ -382,18 +388,51 @@ public class StandardTaskService {
 
     private List<String> topicsForGroup(String requestedTopicGroup) {
         if (requestedTopicGroup == null || requestedTopicGroup.trim().isEmpty()) {
-            return Arrays.asList("fractions", "percent", "equations", "areas", "speed_time_distance");
+            List<TopicNode> nodes = topicNodeRepository.findByStubFalseAndActiveTrueOrderByDisplayNameAsc();
+            if (nodes == null || nodes.isEmpty()) {
+                return Arrays.asList("fractions", "percent", "equations", "areas", "speed_time_distance");
+            }
+            return nodes.stream()
+                    .map(TopicNode::getTopicKey)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
         }
 
-        if ("algebra".equalsIgnoreCase(requestedTopicGroup)) {
-            return Arrays.asList("fractions", "percent", "equations", "speed_time_distance");
+        String g = requestedTopicGroup.trim();
+
+        boolean isGroup = "algebra".equalsIgnoreCase(g)
+                || "geometry".equalsIgnoreCase(g)
+                || "applied".equalsIgnoreCase(g);
+
+        if (!isGroup) {
+            return topicNodeRepository.findByTopicKey(g)
+                    .filter(n -> Boolean.TRUE.equals(n.getActive()) && !Boolean.TRUE.equals(n.getStub()))
+                    .map(n -> Collections.singletonList(n.getTopicKey()))
+                    .orElseGet(() -> Collections.singletonList(g));
         }
 
-        if ("geometry".equalsIgnoreCase(requestedTopicGroup)) {
-            return Collections.singletonList("areas");
+        String discipline = null;
+        if ("algebra".equalsIgnoreCase(g)) {
+            discipline = "Алгебра";
+        } else if ("geometry".equalsIgnoreCase(g)) {
+            discipline = "Геометрия";
+        } else if ("applied".equalsIgnoreCase(g)) {
+            discipline = "Прикладная математика";
         }
 
-        return Collections.singletonList(requestedTopicGroup);
+        if (discipline != null) {
+            List<String> fromDb = topicNodeRepository
+                    .findByDisciplineAndStubFalseAndActiveTrueOrderByDisplayNameAsc(discipline)
+                    .stream()
+                    .map(TopicNode::getTopicKey)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+            if (!fromDb.isEmpty()) {
+                return fromDb;
+            }
+        }
+
+        return Collections.singletonList(g);
     }
 
     private String chooseTopicForUser(Long userId, List<String> candidateTopics) {
@@ -483,6 +522,26 @@ public class StandardTaskService {
                 return "Геометрия";
             case "expressions":
                 return "Выражения";
+            case "ratios":
+                return "Пропорции";
+            case "integers":
+                return "Целые числа";
+            case "decimals":
+                return "Десятичные дроби";
+            case "number_theory":
+                return "Теория чисел";
+            case "word_problems":
+                return "Текстовые задачи";
+            case "statistics":
+                return "Статистика";
+            case "geometry_basics":
+                return "Основы геометрии";
+            case "perimeter":
+                return "Периметр";
+            case "angles":
+                return "Углы";
+            case "coordinate_plane":
+                return "Координатная плоскость";
             case "fractions":
                 return "Работа с дробями";
             case "percent":
